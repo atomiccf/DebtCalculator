@@ -10,12 +10,13 @@ input {
 
 body {
   background-color: azure;
-  font-family: "Forum", cursive;
+  font-family: "Ubuntu", sans-serif;
 }
 
 h1 {
   margin-bottom: 10px;
-  text-align: center;
+  text-align: left;
+  font-family: "Ubuntu", sans-serif;
 }
 
 .container {
@@ -23,10 +24,40 @@ h1 {
   margin: 0 auto;
 }
 
+#app {
+  width: 1200px;
+  margin: 0 auto;
+}
+
+nav {
+  height: 50px;
+  display: flex;
+  align-items: center;
+}
+nav ul {
+  display: flex;
+  flex-flow: row;
+  list-style: none;
+}
+nav ul li {
+  margin-left: 10px;
+}
+
+.wrap {
+  width: 100%;
+  background-color: orange;
+}
+
 .flex_container {
   display: flex;
   flex-flow: column nowrap;
   justify-content: center;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid black;
+  border-radius: 25px;
+  box-shadow: 0 5px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
 .out {

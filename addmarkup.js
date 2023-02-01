@@ -1,4 +1,4 @@
-const a = document.querySelectorAll('[type="date"]')
+
 const btn = document.querySelector('#render');
 const body = document.querySelector('body')
 const app = document.getElementById('app');

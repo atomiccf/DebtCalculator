@@ -5,7 +5,7 @@ const debt = document.getElementsByClassName('debt')
 const outOne = document.getElementsByClassName('out1')
 const outTwo = document.getElementsByClassName('out2')
 const outThree = document.getElementsByClassName('out3')
-
+let rate = 0
 
 function calculateDade(start, end) {
     let dateArr = []
@@ -86,4 +86,28 @@ start.addEventListener('click', () => {
 });
 
 
+const url = 'https://www.nbrb.by/api/refinancingrate';
+let promise = fetch(url)
+    .then ( (response) => {
+        if (response.status !== 200) {
 
+            console.log('Somethig going wrong' + response.status);
+            return
+        }
+
+        return response.json()
+
+    })
+
+    .then (data => {
+
+        let arrayData = data
+
+        rate = arrayData[arrayData.length-1].Value
+
+    })
+    .catch ( err =>{
+
+        console.log('Fetch error',err);
+
+    })

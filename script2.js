@@ -41,10 +41,10 @@ function calculateFine(debt) {
 function calculatePercents(debt) {
     let arrPercent = [];
     let arrDelay = calculateDade(dateStart, dateEnd);
-    const percent = 11.5;
+
     for (let j = 0; j < debt.length; j++) {
 
-        arrPercent.push((debt[j].value / 100 * percent * arrDelay[j] / 365).toFixed(2));
+        arrPercent.push((debt[j].value / 100 * rate * arrDelay[j] / 365).toFixed(2));
 
     }
 
@@ -52,14 +52,6 @@ function calculatePercents(debt) {
 
 
 }
-
-/*function isChecked(){
-    let chbox = document.querySelector('#checkOne')
-    return (chbox.checked) ? true : false
-      
-
-}*/
-
 
 function render(delay, fine, percent) {
     let arrDelay = calculateDade(dateStart, dateEnd);
@@ -87,7 +79,7 @@ start.addEventListener('click', () => {
 
 
 const url = 'https://www.nbrb.by/api/refinancingrate';
-let promise = fetch(url)
+ fetch(url)
     .then ( (response) => {
         if (response.status !== 200) {
 
@@ -104,6 +96,7 @@ let promise = fetch(url)
         let arrayData = data
 
         rate = arrayData[arrayData.length-1].Value
+        return rate
 
     })
     .catch ( err =>{

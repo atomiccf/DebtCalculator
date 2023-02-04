@@ -1,13 +1,12 @@
 
-const btn = document.querySelector('#render');
-const body = document.querySelector('body')
 const app = document.getElementById('app');
+const body = document.querySelector('body')
 
-btn.addEventListener('click',render)
+renderControlPanel()
 
-
-
-function render (){
+const btn = document.querySelector('#render');
+btn.addEventListener('click',renderBlock)
+function renderBlock (){
     const container = document.createElement('div');
     const labelDebt = document.createElement('label');
     const inputDebt = document.createElement('input');
@@ -68,8 +67,31 @@ function render (){
 
 }
 
+function renderControlPanel() {
+    const containerPanel = document.createElement('div');
+    const buttonAdd = document.createElement('button');
+    const buttonDel = document.createElement('button');
+    const buttonCalc = document.createElement('button');
+    const h2 = document.createElement('h2');
 
+    app.prepend(containerPanel);
+    containerPanel.classList.add('container');
+    containerPanel.appendChild(buttonAdd);
+    containerPanel.prepend(h2)
+    h2.innerText = 'Calculation of penalties for an arbitration claim'
+    buttonAdd.classList.add('button');
+    buttonAdd.setAttribute('id','render');
+    buttonAdd.innerText='Add block';
+    containerPanel.appendChild(buttonDel);
+    buttonDel.classList.add('button');
+    buttonDel.setAttribute('id','delete');
+    buttonDel.innerText='Delete block';
+    containerPanel.appendChild(buttonCalc)
+    buttonCalc.classList.add('button')
+    buttonCalc.setAttribute('id','calc');
+    buttonCalc.innerText='Calculate'
 
+}
 
 function addScript() {
     const script = document.createElement('script')

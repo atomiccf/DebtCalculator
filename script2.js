@@ -1,4 +1,5 @@
 const start = document.getElementById('calc');
+const del = document.getElementById('delete');
 const dateStart = document.getElementsByClassName('dateOne')
 const dateEnd = document.getElementsByClassName('dateTwo')
 const debt = document.getElementsByClassName('debt')
@@ -78,12 +79,18 @@ start.addEventListener('click', () => {
 });
 
 
+
+del.addEventListener('click', () => {
+
+    app.lastChild.remove()
+});
+
 const url = 'https://www.nbrb.by/api/refinancingrate';
  fetch(url)
     .then ( (response) => {
         if (response.status !== 200) {
 
-            console.log('Somethig going wrong' + response.status);
+            console.log('Something going wrong' + response.status);
             return
         }
 

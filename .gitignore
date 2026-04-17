@@ -1,3 +1,5 @@
 /style.css.map
 /.idea/watcherTasks.xml
 /.idea/.gitignore
+/node_modules
+/dist

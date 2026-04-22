@@ -1,3 +1,5 @@
+import { Temporal } from '@js-temporal/polyfill';
+
 export interface BaseValueRecord {
   value: number;
   dateFrom: string;
@@ -15,12 +17,26 @@ export const baseValueHistory: BaseValueRecord[] = [
   { value: 25.5, dateFrom: '2019-01-01', act: 'Постановление Совмина от 27.12.2018 №956' },
 ];
 
-export function getBaseValue(date: Date | string = new Date()): number {
-  const checkDate = typeof date === 'string' ? new Date(date) : date;
+function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
+  if (date instanceof Date) {
+    return Temporal.PlainDate.from({
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate()
+    });
+  }
+  if (typeof date === 'string') {
+    return Temporal.PlainDate.from(date);
+  }
+  return date;
+}
+
+export function getBaseValue(date?: Temporal.PlainDate | Date | string): number {
+  const checkDate = date ? parseDate(date) : Temporal.Now.plainDateISO();
   
   for (const record of baseValueHistory) {
-    const recordDate = new Date(record.dateFrom);
-    if (checkDate >= recordDate) {
+    const recordDate = Temporal.PlainDate.from(record.dateFrom);
+    if (checkDate.since(recordDate).days >= 0) {
       return record.value;
     }
   }
@@ -28,12 +44,12 @@ export function getBaseValue(date: Date | string = new Date()): number {
   return baseValueHistory[baseValueHistory.length - 1].value;
 }
 
-export function getBaseValueInfo(date: Date | string = new Date()): BaseValueRecord {
-  const checkDate = typeof date === 'string' ? new Date(date) : date;
+export function getBaseValueInfo(date?: Temporal.PlainDate | Date | string): BaseValueRecord {
+  const checkDate = date ? parseDate(date) : Temporal.Now.plainDateISO();
   
   for (const record of baseValueHistory) {
-    const recordDate = new Date(record.dateFrom);
-    if (checkDate >= recordDate) {
+    const recordDate = Temporal.PlainDate.from(record.dateFrom);
+    if (checkDate.since(recordDate).days >= 0) {
       return record;
     }
   }

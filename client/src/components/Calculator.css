@@ -10,6 +10,16 @@
   color: #2c3e50;
 }
 
+.calculator-description {
+  color: #7f8c8d;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.result-breakdown p {
+  margin: 0.25rem 0;
+}
+
 .form-group {
   margin-bottom: 1rem;
 }

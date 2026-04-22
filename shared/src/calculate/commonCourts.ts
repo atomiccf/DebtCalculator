@@ -1,4 +1,11 @@
-import { getBaseValue } from '../../api/basicValues';
+import { getBaseValue } from '../api/baseValue';
+
+function calcPropertyDuty(amount: number, date: Date | string): number {
+  const baseValue = getBaseValue(date);
+  const minDuty = 2 * baseValue;
+  const calculated = amount * 0.05;
+  return Math.max(calculated, minDuty);
+}
 
 export type CaseType = 
   | 'property'           // имущественный иск
@@ -19,13 +26,6 @@ export interface CourtRatesConfig {
   caseType: CaseType;
   isRepeated?: boolean;
   plaintiffType: 'individual' | 'organization';
-}
-
-function calcPropertyDuty(amount: number, date: Date | string): number {
-  const baseValue = getBaseValue(date);
-  const minDuty = 2 * baseValue;
-  const calculated = amount * 0.05;
-  return Math.max(calculated, minDuty);
 }
 
 export function calculateCommonCourtDuty(config: CourtRatesConfig, amount?: number, date: Date | string = new Date()): number {

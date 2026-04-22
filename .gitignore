@@ -1,5 +1,11 @@
 /style.css.map
 /.idea/watcherTasks.xml
 /.idea/.gitignore
+/server/node_modules
+/server/dist
+/client/node_modules
+/client/dist
+/shared/dist
+/shared/node_modules
 /node_modules
 /dist

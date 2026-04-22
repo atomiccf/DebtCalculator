@@ -1,26 +1,4 @@
-import { getBaseValue } from '../../api/basicValues';
-
-export type EconomicCaseType = 
-  | 'property'              // имущественный иск в ЭС
-  | 'property_quality'      // спор о качестве поставленного товара
-  | 'non_property_org'     // неимущественный иск (юрлицо)
-  | 'non_property_ip'      // неимущественный иск (ИП)
-  | 'non_property_person'  // неимущественный иск (гражданин)
-  | 'subsidiary'           // привлечение к субсидиарной ответственности
-  | 'appeal'              // апелляционная жалоба
-  | 'cassation'           // кассационная жалоба
-  | 'supervision'         // надзорная жалоба
-  | 'court_order'        // приказное производство
-  | 'bankruptcy'         // банкротство
-  | 'fact_establishment' // установление факта
-  | 'challenge_act'     // оспаривание акта
-  | 'other_complaint';  // иная жалоба
-
-export interface EconomicRatesConfig {
-  caseType: EconomicCaseType;
-  plaintiffType: 'individual' | 'organization' | 'ip';
-  courtLevel: 'economic' | 'supreme_economic';
-}
+import { getBaseValue } from '../api/baseValue';
 
 function calcPropertyDutyEconomics(amount: number, date: Date | string): number {
   const baseValue = getBaseValue(date);
@@ -46,6 +24,28 @@ function calcPropertyDutyEconomics(amount: number, date: Date | string): number 
   
   const minAt10000 = 5 * 1000 * BV / 100 + (10000 * BV - 1000 * BV) * 0.03;
   return Math.max(result, minAt10000);
+}
+
+export type EconomicCaseType = 
+  | 'property'              // имущественный иск в ЭС
+  | 'property_quality'      // спор о качестве поставленного товара
+  | 'non_property_org'     // неимущественный иск (юрлицо)
+  | 'non_property_ip'      // неимущественный иск (ИП)
+  | 'non_property_person'  // неимущественный иск (гражданин)
+  | 'subsidiary'           // привлечение к субсидиарной ответственности
+  | 'appeal'              // апелляционная жалоба
+  | 'cassation'           // кассационная жалоба
+  | 'supervision'         // надзорная жалоба
+  | 'court_order'        // приказное производство
+  | 'bankruptcy'         // банкротство
+  | 'fact_establishment' // установление факта
+  | 'challenge_act'     // оспаривание акта
+  | 'other_complaint';  // иная жалоба
+
+export interface EconomicRatesConfig {
+  caseType: EconomicCaseType;
+  plaintiffType: 'individual' | 'organization' | 'ip';
+  courtLevel: 'economic' | 'supreme_economic';
 }
 
 export function calculateEconomicCourtDuty(

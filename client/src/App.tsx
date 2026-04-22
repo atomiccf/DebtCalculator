@@ -72,14 +72,8 @@ function App() {
       </main>
       
       <footer className="footer">
-        {rates ? (
-          <>
-            <p>Базовая величина: {rates.baseValue} BYN (с {rates.baseValueDate})</p>
-            <p>Ставка рефинансирования: {rates.refinancingRate}% (с {rates.refinancingRateDate}){rates.fallback && ' *'}</p>
-          </>
-        ) : (
-          <p>Загрузка...</p>
-        )}
+        <p>Базовая величина: 45 BYN (с 01.01.2026)</p>
+        <p>Ставка рефинансирования: 10% (с 20.03.2025)</p>
       </footer>
     </div>
   )

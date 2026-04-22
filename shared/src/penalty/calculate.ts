@@ -1,9 +1,10 @@
+import { Temporal } from '@js-temporal/polyfill';
 import { getRefinancingRate } from '../api/refinancingRate';
 
 export interface PenaltyInput {
   debt: number;
-  startDate: Date | string;
-  endDate: Date | string;
+  startDate: Temporal.PlainDate | Date | string;
+  endDate: Temporal.PlainDate | Date | string;
   rate?: number;
 }
 
@@ -25,28 +26,18 @@ export interface PenaltyPeriod {
 
 const DEFAULT_RATE = 0.1;
 
-function isLeapYear(year: number): boolean {
-  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-}
-
-function isLeapYearInPeriod(startDate: Date, endDate: Date): boolean {
-  const startYear = startDate.getFullYear();
-  const endYear = endDate.getFullYear();
-  
-  if (startYear === endYear) {
-    return isLeapYear(startYear);
+function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
+  if (date instanceof Date) {
+    return Temporal.PlainDate.from({
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate()
+    });
   }
-  
-  for (let year = startYear; year <= endYear; year++) {
-    if (isLeapYear(year)) {
-      const leapYearStart = new Date(year, 1, 29);
-      if (leapYearStart >= startDate && leapYearStart <= endDate) {
-        return true;
-      }
-    }
+  if (typeof date === 'string') {
+    return Temporal.PlainDate.from(date);
   }
-  
-  return false;
+  return date;
 }
 
 export function calculatePenalty(input: PenaltyInput): PenaltyResult {
@@ -56,24 +47,11 @@ export function calculatePenalty(input: PenaltyInput): PenaltyResult {
     throw new Error('Сумма долга должна быть больше 0');
   }
   
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
   
-  if (isNaN(start.getTime())) {
-    throw new Error('Некорректная дата начала периода');
-  }
-  
-  if (isNaN(end.getTime())) {
-    throw new Error('Некорректная дата окончания периода');
-  }
-  
-  if (end < start) {
-    throw new Error('Дата окончания не может быть раньше даты начала');
-  }
-  
-  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const yearDivisor = isLeapYearInPeriod(start, end) ? 366 : 365;
-  const penalty = (debt * rate * totalDays) / (100 * yearDivisor);
+  const totalDays = start.until(end).days + 1;
+  const penalty = (debt * rate * totalDays) / 100;
   
   return {
     days: totalDays,
@@ -81,8 +59,8 @@ export function calculatePenalty(input: PenaltyInput): PenaltyResult {
     rate,
     yearDivisor,
     breakdown: [{
-      startDate: start.toISOString().split('T')[0],
-      endDate: end.toISOString().split('T')[0],
+      startDate: start.toString(),
+      endDate: end.toString(),
       days: totalDays,
       rate,
       amount: Math.round(penalty * 100) / 100
@@ -92,70 +70,69 @@ export function calculatePenalty(input: PenaltyInput): PenaltyResult {
 
 export function calculatePenaltyWithRateChange(
   debt: number,
-  startDate: Date | string,
-  endDate: Date | string,
+  startDate: Temporal.PlainDate | Date | string,
+  endDate: Temporal.PlainDate | Date | string,
   rates: { rate: number; dateFrom: string }[]
 ): PenaltyResult {
   if (debt <= 0) {
     throw new Error('Сумма долга должна быть больше 0');
   }
   
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
   
   const sortedRates = [...rates].sort((a, b) => 
-    new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime()
+    Temporal.PlainDate.from(a.dateFrom).since(start).days - Temporal.PlainDate.from(b.dateFrom).since(start).days
   );
   
-  let currentDate = new Date(start);
+  let currentDate = start;
   let totalPenalty = 0;
   const breakdown: PenaltyPeriod[] = [];
   
   for (const rateInfo of sortedRates) {
-    const rateDate = new Date(rateInfo.dateFrom);
+    const rateDate = Temporal.PlainDate.from(rateInfo.dateFrom);
     
-    if (rateDate > end) break;
+    if (rateDate.since(end).days > 0) break;
     
-    const periodStart = currentDate > start ? currentDate : start;
-    const periodEnd = rateDate <= end ? new Date(rateDate.getTime() - 1) : end;
+    const periodStart = currentDate.since(start).days > 0 ? currentDate : start;
+    const periodEnd = rateDate.since(end).days <= 0 
+      ? rateDate.subtract({ days: 1 })
+      : end;
     
-    if (periodEnd < periodStart) continue;
+    if (periodEnd.since(periodStart).days < 0) continue;
     
-    const days = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const periodYearDivisor = isLeapYearInPeriod(periodStart, periodEnd) ? 366 : 365;
-    const periodPenalty = (debt * rateInfo.rate * days) / (100 * periodYearDivisor);
+    const days = periodStart.until(periodEnd).days + 1;
+    const periodPenalty = (debt * rateInfo.rate * days) / 100;
     totalPenalty += periodPenalty;
     
     breakdown.push({
-      startDate: periodStart.toISOString().split('T')[0],
-      endDate: periodEnd.toISOString().split('T')[0],
+      startDate: periodStart.toString(),
+      endDate: periodEnd.toString(),
       days,
       rate: rateInfo.rate,
       amount: Math.round(periodPenalty * 100) / 100
     });
     
-    currentDate = new Date(rateDate);
+    currentDate = rateDate;
   }
   
-  if (currentDate <= end) {
+  if (currentDate.since(end).days <= 0) {
     const lastRate = sortedRates[sortedRates.length - 1].rate;
-    const days = Math.ceil((end.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const periodYearDivisor = isLeapYearInPeriod(currentDate, end) ? 366 : 365;
-    const periodPenalty = (debt * lastRate * days) / (100 * periodYearDivisor);
+    const days = currentDate.until(end).days + 1;
+    const periodPenalty = (debt * lastRate * days) / 100;
     totalPenalty += periodPenalty;
     
     breakdown.push({
-      startDate: currentDate.toISOString().split('T')[0],
-      endDate: end.toISOString().split('T')[0],
+      startDate: currentDate.toString(),
+      endDate: end.toString(),
       days,
       rate: lastRate,
       amount: Math.round(periodPenalty * 100) / 100
     });
   }
   
-  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const yearDivisor = isLeapYearInPeriod(start, end) ? 366 : 365;
-
+  const totalDays = start.until(end).days + 1;
+  
   return {
     days: totalDays,
     penalty: Math.round(totalPenalty * 100) / 100,
@@ -167,28 +144,23 @@ export function calculatePenaltyWithRateChange(
 
 export function calculateInterestOnDebt(
   debt: number,
-  startDate: Date | string,
-  endDate: Date | string,
+  startDate: Temporal.PlainDate | Date | string,
+  endDate: Temporal.PlainDate | Date | string,
   annualRate: number
-): { interest: number; days: number; yearDivisor: number } {
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+): number {
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
   
-  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const yearDivisor = isLeapYearInPeriod(start, end) ? 366 : 365;
-  const interest = (debt * annualRate * days) / (100 * yearDivisor);
+  const days = start.until(end).days + 1;
+  const interest = (debt * annualRate * days) / (100 * 365);
   
-  return {
-    interest: Math.round(interest * 100) / 100,
-    days,
-    yearDivisor
-  };
+  return Math.round(interest * 100) / 100;
 }
 
 export interface Interest366Input {
   debt: number;
-  startDate: Date | string;
-  endDate: Date | string;
+  startDate: Temporal.PlainDate | Date | string;
+  endDate: Temporal.PlainDate | Date | string;
 }
 
 export interface Interest366Result {
@@ -207,29 +179,17 @@ export function calculateInterest366(input: Interest366Input): Interest366Result
     throw new Error('Сумма долга должна быть больше 0');
   }
   
-  const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
-  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
   
-  if (isNaN(start.getTime())) {
-    throw new Error('Некорректная дата начала периода');
-  }
-  
-  if (isNaN(end.getTime())) {
-    throw new Error('Некорректная дата окончания периода');
-  }
-  
-  if (end < start) {
-    throw new Error('Дата окончания не может быть раньше даты начала');
-  }
-  
-  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const refinancingRate = getRefinancingRate(end);
+  const days = start.until(end).days + 1;
+  const refinancingRate = getRefinancingRate(end.toString());
   const interest = (debt * refinancingRate * days) / (100 * 365);
   
   return {
     debt,
-    startDate: start.toISOString().split('T')[0],
-    endDate: end.toISOString().split('T')[0],
+    startDate: start.toString(),
+    endDate: end.toString(),
     days,
     refinancingRate,
     interest: Math.round(interest * 100) / 100
@@ -239,8 +199,8 @@ export function calculateInterest366(input: Interest366Input): Interest366Result
 export interface Interest366Document {
   name: string;
   debt: number;
-  startDate: Date | string;
-  endDate: Date | string;
+  startDate: Temporal.PlainDate | Date | string;
+  endDate: Temporal.PlainDate | Date | string;
 }
 
 export interface Interest366DocumentResult {
@@ -274,28 +234,18 @@ export function calculateInterest366Multiple(documents: Interest366Document[]): 
       throw new Error('Сумма долга должна быть больше 0');
     }
 
-    const start = typeof doc.startDate === 'string' ? new Date(doc.startDate) : doc.startDate;
-    const end = typeof doc.endDate === 'string' ? new Date(doc.endDate) : doc.endDate;
+    const start = parseDate(doc.startDate);
+    const end = parseDate(doc.endDate);
 
-    if (isNaN(start.getTime())) {
-      throw new Error('Некорректная дата начала для документа: ' + doc.name);
-    }
-    if (isNaN(end.getTime())) {
-      throw new Error('Некорректная дата окончания для документа: ' + doc.name);
-    }
-    if (end < start) {
-      throw new Error('Дата окончания не может быть раньше даты начала для документа: ' + doc.name);
-    }
-
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const refinancingRate = getRefinancingRate(end);
+    const days = start.until(end).days + 1;
+    const refinancingRate = getRefinancingRate(end.toString());
     const interest = (doc.debt * refinancingRate * days) / (100 * 365);
 
     results.push({
       name: doc.name,
       debt: doc.debt,
-      startDate: start.toISOString().split('T')[0],
-      endDate: end.toISOString().split('T')[0],
+      startDate: start.toString(),
+      endDate: end.toString(),
       days,
       refinancingRate,
       interest: Math.round(interest * 100) / 100

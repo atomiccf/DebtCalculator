@@ -1,3 +1,5 @@
+import { Temporal } from '@js-temporal/polyfill';
+
 export interface RefinancingRate {
   value: number;
   date: string;
@@ -44,12 +46,26 @@ export const refinancingRateHistory: RefinancingRateHistory[] = [
   { value: 26, dateFrom: '2015-01-23', act: 'Постановление Правления НБРБ' },
 ];
 
-export function getRefinancingRate(date: Date | string = new Date()): number {
-  const checkDate = typeof date === 'string' ? new Date(date) : date;
+function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
+  if (date instanceof Date) {
+    return Temporal.PlainDate.from({
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate()
+    });
+  }
+  if (typeof date === 'string') {
+    return Temporal.PlainDate.from(date);
+  }
+  return date;
+}
+
+export function getRefinancingRate(date?: Temporal.PlainDate | Date | string): number {
+  const checkDate = date ? parseDate(date) : Temporal.Now.plainDateISO();
   
   for (const record of refinancingRateHistory) {
-    const recordDate = new Date(record.dateFrom);
-    if (checkDate >= recordDate) {
+    const recordDate = Temporal.PlainDate.from(record.dateFrom);
+    if (checkDate.since(recordDate).days >= 0) {
       return record.value;
     }
   }
@@ -57,25 +73,12 @@ export function getRefinancingRate(date: Date | string = new Date()): number {
   return refinancingRateHistory[refinancingRateHistory.length - 1].value;
 }
 
-export function getRefinancingRateOnDate(date: Date | string): RefinancingRateHistory {
-  const checkDate = typeof date === 'string' ? new Date(date) : date;
+export function getRefinancingRateInfo(date?: Temporal.PlainDate | Date | string): RefinancingRateHistory {
+  const checkDate = date ? parseDate(date) : Temporal.Now.plainDateISO();
   
   for (const record of refinancingRateHistory) {
-    const recordDate = new Date(record.dateFrom);
-    if (checkDate >= recordDate) {
-      return record;
-    }
-  }
-  
-  return refinancingRateHistory[refinancingRateHistory.length - 1];
-}
-
-export function getRefinancingRateInfo(date: Date | string = new Date()): RefinancingRateHistory {
-  const checkDate = typeof date === 'string' ? new Date(date) : date;
-  
-  for (const record of refinancingRateHistory) {
-    const recordDate = new Date(record.dateFrom);
-    if (checkDate >= recordDate) {
+    const recordDate = Temporal.PlainDate.from(record.dateFrom);
+    if (checkDate.since(recordDate).days >= 0) {
       return record;
     }
   }

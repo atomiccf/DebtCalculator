@@ -10,6 +10,8 @@ import {
   getCurrentRefinancingRate,
   calculatePenalty,
   calculateInterestOnDebt,
+  calculateInterest366,
+  calculateInterest366Multiple,
   DutyCalculationInput,
   DutyCalculationResult,
   CaseType
@@ -233,6 +235,46 @@ app.post('/api/penalty/calculate-multiple', (req: Request, res: Response) => {
       rate: rateValue,
       type: annualRate ? 'interest' : 'penalty'
     });
+    
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Ошибка расчёта';
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post('/api/interest/calculate-366', (req: Request, res: Response) => {
+  try {
+    const { debt, startDate, endDate } = req.body;
+    
+    if (!debt || debt <= 0) {
+      res.status(400).json({ error: 'Необходимо указать сумму долга' });
+      return;
+    }
+    if (!startDate || !endDate) {
+      res.status(400).json({ error: 'Необходимо указать даты начала и окончания периода' });
+      return;
+    }
+
+    const result = calculateInterest366({ debt, startDate, endDate });
+    res.json(result);
+    
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Ошибка расчёта';
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post('/api/interest/calculate-366-multiple', (req: Request, res: Response) => {
+  try {
+    const { documents } = req.body;
+    
+    if (!documents || !Array.isArray(documents) || documents.length === 0) {
+      res.status(400).json({ error: 'Необходимо указать список документов' });
+      return;
+    }
+
+    const result = calculateInterest366Multiple(documents);
+    res.json(result);
     
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ошибка расчёта';

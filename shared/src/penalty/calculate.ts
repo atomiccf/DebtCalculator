@@ -25,6 +25,7 @@ export interface PenaltyPeriod {
 }
 
 const DEFAULT_RATE = 0.1;
+const DEFAULT_YEAR_DIVISOR = 365;
 
 function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
   if (date instanceof Date) {
@@ -57,7 +58,7 @@ export function calculatePenalty(input: PenaltyInput): PenaltyResult {
     days: totalDays,
     penalty: Math.round(penalty * 100) / 100,
     rate,
-    yearDivisor,
+    yearDivisor: DEFAULT_YEAR_DIVISOR,
     breakdown: [{
       startDate: start.toString(),
       endDate: end.toString(),
@@ -137,7 +138,7 @@ export function calculatePenaltyWithRateChange(
     days: totalDays,
     penalty: Math.round(totalPenalty * 100) / 100,
     rate: sortedRates[0].rate,
-    yearDivisor,
+    yearDivisor: DEFAULT_YEAR_DIVISOR,
     breakdown
   };
 }

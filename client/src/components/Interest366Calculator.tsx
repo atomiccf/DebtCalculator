@@ -1,12 +1,8 @@
-import { useState } from 'react'
-import './Calculator.css'
-
-interface InterestDocument {
-  name: string
-  debt: number
-  startDate: string
-  endDate: string
-}
+import styles from '../components/Calculator.module.css'
+import { useApi } from '../hooks/useApi'
+import { useDocuments } from '../hooks/useDocuments'
+import { DocumentForm, ResultsTable } from '../components/ui'
+import { API_ENDPOINTS } from '../config/api'
 
 interface DocumentResult {
   name: string
@@ -23,176 +19,73 @@ interface InterestResult {
   total: number
 }
 
-const API_URL = 'http://localhost:3000'
-
-const emptyDocument: InterestDocument = {
-  name: '',
-  debt: 0,
-  startDate: '',
-  endDate: ''
-}
-
 export default function Interest366Calculator() {
-  const [documents, setDocuments] = useState<InterestDocument[]>([{ ...emptyDocument }, { ...emptyDocument }])
-  const [result, setResult] = useState<InterestResult | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleAddDocument = () => {
-    setDocuments([...documents, { ...emptyDocument }])
-  }
-
-  const handleRemoveDocument = (index: number) => {
-    if (documents.length <= 1) return
-    setDocuments(documents.filter((_, i) => i !== index))
-  }
-
-  const handleDocumentChange = (index: number, field: keyof InterestDocument, value: string | number) => {
-    const updated = [...documents]
-    updated[index] = { ...updated[index], [field]: value }
-    setDocuments(updated)
-  }
+  const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
+  const { data, error, loading, execute } = useApi<InterestResult>(API_ENDPOINTS.INTEREST_366_MULTIPLE)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setResult(null)
-    setLoading(true)
-
-    try {
-      const response = await fetch(`${API_URL}/api/interest/calculate-366-multiple`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documents })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка расчёта')
-      }
-
-      setResult(data)
-    } catch (err) {
-      if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Ошибка соединения с сервером. Убедитесь, что сервер запущен на порту 3000.')
-      } else {
-        setError(err instanceof Error ? err.message : 'Ошибка расчёта')
-      }
-    } finally {
-      setLoading(false)
-    }
+    await execute({ documents })
   }
 
+  const results = data?.results as unknown as Record<string, unknown>[] ?? []
+  const total = data?.total ?? 0
+
+  const columns = [
+    { key: 'name', header: 'Документ' },
+    { key: 'debt', header: 'Сумма', render: (v: unknown) => `${v} BYN` },
+    { key: 'startDate', header: 'Период', render: (_: unknown, row: unknown) => {
+      const r = row as DocumentResult
+      return `${r.startDate} — ${r.endDate}`
+    }},
+    { key: 'days', header: 'Дней' },
+    { key: 'refinancingRate', header: 'Ставка', render: (v: unknown) => `${v}%` },
+    { key: 'interest', header: 'Проценты', render: (v: unknown) => `${v} BYN` },
+  ]
+
+  const totalRow = [
+    { value: 'Итого', colSpan: 5 },
+    { value: `${total} BYN` },
+  ]
+
   return (
-    <div className="calculator">
+    <div className={styles.calculator}>
       <h2>Проценты по ст.366 ГК РБ</h2>
-      <p className="calculator-description">
+      <p className={styles.calculatorDescription}>
         Расчёт процентов за пользование чужими денежными средствами по ставке рефинансирования Нацбанка Республики Беларусь
       </p>
       
       <form onSubmit={handleSubmit}>
-        <div className="documents-header">
+        <div className={styles.documentsHeader}>
           <span>Документы</span>
-          <button type="button" className="btn-add" onClick={handleAddDocument}>
+          <button type="button" className={styles.btnAdd} onClick={addDocument}>
             + Добавить документ
           </button>
         </div>
 
-        <div className="documents-list">
+        <div className={styles.documentsList}>
           {documents.map((doc, index) => (
-            <div key={index} className="document-row">
-              <div className="document-fields">
-                <div className="form-group">
-                  <input 
-                    type="text" 
-                    value={doc.name}
-                    onChange={(e) => handleDocumentChange(index, 'name', e.target.value)}
-                    placeholder="Название (накладная №, договор и т.д.)"
-                  />
-                </div>
-                <div className="form-group">
-                  <input 
-                    type="number" 
-                    value={doc.debt || ''}
-                    onChange={(e) => handleDocumentChange(index, 'debt', parseFloat(e.target.value) || 0)}
-                    placeholder="Сумма (BYN)"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>с</label>
-                  <input 
-                    type="date" 
-                    value={doc.startDate}
-                    onChange={(e) => handleDocumentChange(index, 'startDate', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>по</label>
-                  <input 
-                    type="date" 
-                    value={doc.endDate}
-                    onChange={(e) => handleDocumentChange(index, 'endDate', e.target.value)}
-                  />
-                </div>
-              </div>
-              {documents.length > 1 && (
-                <button 
-                  type="button" 
-                  className="btn-remove"
-                  onClick={() => handleRemoveDocument(index)}
-                  title="Удалить документ"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            <DocumentForm
+              key={index}
+              document={doc}
+              index={index}
+              onChange={updateDocument}
+              onRemove={removeDocument}
+              canRemove={documents.length > 1}
+            />
           ))}
         </div>
 
-        <button type="submit" className="btn" disabled={loading}>
+        <button type="submit" className={styles.btn} disabled={loading}>
           {loading ? 'Расчёт...' : 'Рассчитать'}
         </button>
       </form>
 
-      {result && (
-        <div className="results">
-          <table className="results-table">
-            <thead>
-              <tr>
-                <th>Документ</th>
-                <th>Сумма</th>
-                <th>Период</th>
-                <th>Дней</th>
-                <th>Ставка</th>
-                <th>Проценты</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.results.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.name}</td>
-                  <td>{r.debt} BYN</td>
-                  <td>{r.startDate} — {r.endDate}</td>
-                  <td>{r.days}</td>
-                  <td>{r.refinancingRate}%</td>
-                  <td>{r.interest} BYN</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="total-row">
-                <td colSpan={5}>Итого</td>
-                <td>{result.total} BYN</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+      {results.length > 0 && (
+        <ResultsTable columns={columns} data={results} totalRow={totalRow} />
       )}
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className={styles.error}>{error}</div>}
     </div>
   )
 }

@@ -1,12 +1,9 @@
 import { useState } from 'react'
-import './Calculator.css'
-
-interface DocumentPenalty {
-  name: string
-  debt: number
-  startDate: string
-  endDate: string
-}
+import styles from '../components/Calculator.module.css'
+import { useApi } from '../hooks/useApi'
+import { useDocuments } from '../hooks/useDocuments'
+import { DocumentForm, ResultsTable, FormField } from '../components/ui'
+import { API_ENDPOINTS } from '../config/api'
 
 interface DocumentResult {
   name: string
@@ -23,142 +20,65 @@ interface PenaltyResult {
   rate: number
 }
 
-const API_URL = 'http://localhost:3000'
-
-const emptyDocument: DocumentPenalty = {
-  name: '',
-  debt: 0,
-  startDate: '',
-  endDate: ''
-}
-
 export default function PenaltyCalculator() {
-  const [documents, setDocuments] = useState<DocumentPenalty[]>([{ ...emptyDocument }, { ...emptyDocument }])
   const [rate, setRate] = useState('')
-  const [result, setResult] = useState<PenaltyResult | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleAddDocument = () => {
-    setDocuments([...documents, { ...emptyDocument }])
-  }
-
-  const handleRemoveDocument = (index: number) => {
-    if (documents.length <= 1) return
-    setDocuments(documents.filter((_, i) => i !== index))
-  }
-
-  const handleDocumentChange = (index: number, field: keyof DocumentPenalty, value: string | number) => {
-    const updated = [...documents]
-    updated[index] = { ...updated[index], [field]: value }
-    setDocuments(updated)
-  }
+  const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
+  const { data, error, loading, execute } = useApi<PenaltyResult>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setResult(null)
-    setLoading(true)
-
-    try {
-      const response = await fetch(`${API_URL}/api/penalty/calculate-multiple`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documents,
-          rate: rate ? parseFloat(rate) : undefined
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка расчёта')
-      }
-
-      setResult({
-        results: data.results,
-        total: data.total,
-        rate: data.rate
-      })
-    } catch (err) {
-      if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Ошибка соединения с сервером. Убедитесь, что сервер запущен на порту 3000.')
-      } else {
-        setError(err instanceof Error ? err.message : 'Ошибка расчёта')
-      }
-    } finally {
-      setLoading(false)
-    }
+    await execute({
+      documents,
+      rate: rate ? parseFloat(rate) : undefined
+    })
   }
 
+  const results = data?.results as unknown as Record<string, unknown>[] ?? []
+  const total = data?.total ?? 0
+  const resultRate = data?.rate ?? 0
+
+  const columns = [
+    { key: 'name', header: 'Документ' },
+    { key: 'debt', header: 'Сумма', render: (v: unknown) => `${v} BYN` },
+    { key: 'startDate', header: 'Период', render: (_: unknown, row: unknown) => {
+      const r = row as DocumentResult
+      return `${r.startDate} — ${r.endDate}`
+    }},
+    { key: 'days', header: 'Дней' },
+    { key: 'penalty', header: 'Пени', render: (v: unknown) => `${v} BYN` },
+  ]
+
+  const totalRow = [
+    { value: 'Итого', colSpan: 4 },
+    { value: `${total} BYN` },
+  ]
+
   return (
-    <div className="calculator">
+    <div className={styles.calculator}>
       <h2>Калькулятор пени</h2>
       
       <form onSubmit={handleSubmit}>
-        <div className="documents-header">
+        <div className={styles.documentsHeader}>
           <span>Документы</span>
-          <button type="button" className="btn-add" onClick={handleAddDocument}>
+          <button type="button" className={styles.btnAdd} onClick={addDocument}>
             + Добавить документ
           </button>
         </div>
 
-        <div className="documents-list">
+        <div className={styles.documentsList}>
           {documents.map((doc, index) => (
-            <div key={index} className="document-row">
-              <div className="document-fields">
-                <div className="form-group">
-                  <input 
-                    type="text" 
-                    value={doc.name}
-                    onChange={(e) => handleDocumentChange(index, 'name', e.target.value)}
-                    placeholder="Название (накладная №, договор и т.д.)"
-                  />
-                </div>
-                <div className="form-group">
-                  <input 
-                    type="number" 
-                    value={doc.debt || ''}
-                    onChange={(e) => handleDocumentChange(index, 'debt', parseFloat(e.target.value) || 0)}
-                    placeholder="Сумма (BYN)"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>с</label>
-                  <input 
-                    type="date" 
-                    value={doc.startDate}
-                    onChange={(e) => handleDocumentChange(index, 'startDate', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>по</label>
-                  <input 
-                    type="date" 
-                    value={doc.endDate}
-                    onChange={(e) => handleDocumentChange(index, 'endDate', e.target.value)}
-                  />
-                </div>
-              </div>
-              {documents.length > 1 && (
-                <button 
-                  type="button" 
-                  className="btn-remove"
-                  onClick={() => handleRemoveDocument(index)}
-                  title="Удалить документ"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            <DocumentForm
+              key={index}
+              document={doc}
+              index={index}
+              onChange={updateDocument}
+              onRemove={removeDocument}
+              canRemove={documents.length > 1}
+            />
           ))}
         </div>
 
-        <div className="form-group">
-          <label>Ставка пени (% в день, по умолчанию 0.1%)</label>
+        <FormField label="Ставка пени (% в день, по умолчанию 0.1%)">
           <input 
             type="number" 
             value={rate} 
@@ -167,50 +87,24 @@ export default function PenaltyCalculator() {
             min="0"
             step="0.01"
           />
-        </div>
+        </FormField>
 
-        <button type="submit" className="btn" disabled={loading}>
+        <button type="submit" className={styles.btn} disabled={loading}>
           {loading ? 'Расчёт...' : 'Рассчитать'}
         </button>
       </form>
 
-      {result && (
-        <div className="results">
-          <table className="results-table">
-            <thead>
-              <tr>
-                <th>Документ</th>
-                <th>Сумма</th>
-                <th>Период</th>
-                <th>Дней</th>
-                <th>Пени</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.results.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.name}</td>
-                  <td>{r.debt} BYN</td>
-                  <td>{r.startDate} — {r.endDate}</td>
-                  <td>{r.days}</td>
-                  <td>{r.penalty} BYN</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="total-row">
-                <td colSpan={4}>Итого</td>
-                <td>{result.total} BYN</td>
-              </tr>
-            </tfoot>
-          </table>
-          <div className="results-summary">
-            Ставка: {result.rate}% в день
-          </div>
+      {results.length > 0 && (
+        <ResultsTable columns={columns} data={results} totalRow={totalRow} />
+      )}
+
+      {results.length > 0 && (
+        <div className={styles.resultsSummary}>
+          Ставка: {resultRate}% в день
         </div>
       )}
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className={styles.error}>{error}</div>}
     </div>
   )
 }

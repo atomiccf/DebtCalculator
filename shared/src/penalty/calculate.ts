@@ -13,6 +13,7 @@ export interface PenaltyResult {
   penalty: number;
   rate: number;
   breakdown: PenaltyPeriod[];
+  yearDivisor: number;
 }
 
 export interface PenaltyPeriod {
@@ -56,6 +57,7 @@ export function calculatePenalty(input: PenaltyInput): PenaltyResult {
     days: totalDays,
     penalty: Math.round(penalty * 100) / 100,
     rate,
+    yearDivisor,
     breakdown: [{
       startDate: start.toString(),
       endDate: end.toString(),
@@ -135,6 +137,7 @@ export function calculatePenaltyWithRateChange(
     days: totalDays,
     penalty: Math.round(totalPenalty * 100) / 100,
     rate: sortedRates[0].rate,
+    yearDivisor,
     breakdown
   };
 }

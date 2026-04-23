@@ -44,7 +44,7 @@
   color: white;
 }
 
-.tab.active {
+.tabActive {
   background: #3498db;
   color: white;
 }

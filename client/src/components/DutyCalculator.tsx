@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
-import './Calculator.css'
+import styles from '../components/Calculator.module.css'
+import { useApi } from '../hooks/useApi'
+import { FormField } from '../components/ui'
+import { API_ENDPOINTS } from '../config/api'
 
 interface DutyResult {
   amount: number
@@ -10,11 +13,6 @@ interface DutyResult {
 interface CaseType {
   id: string
   name: string
-}
-
-interface CaseTypesResponse {
-  common: CaseType[]
-  economic: CaseType[]
 }
 
 const courtTypes = [
@@ -28,102 +26,72 @@ const plaintiffTypes = [
   { value: 'organization', label: 'Юридическое лицо' },
 ]
 
-const API_URL = 'http://localhost:3000'
+interface CaseTypesResponse {
+  common: CaseType[]
+  economic: CaseType[]
+}
 
 export default function DutyCalculator() {
   const [courtType, setCourtType] = useState('common')
   const [caseType, setCaseType] = useState('property')
   const [plaintiffType, setPlaintiffType] = useState('individual')
   const [amount, setAmount] = useState('')
-  const [result, setResult] = useState<DutyResult | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  
   const [commonCaseTypes, setCommonCaseTypes] = useState<CaseType[]>([])
   const [economicCaseTypes, setEconomicCaseTypes] = useState<CaseType[]>([])
 
+  const { data: caseTypesData, error: caseTypesError, execute: fetchCaseTypes } = useApi<CaseTypesResponse>(API_ENDPOINTS.DUTY_CASE_TYPES, 'GET')
+  const { data: dutyData, error, loading, execute } = useApi<DutyResult>(API_ENDPOINTS.DUTY_CALCULATE)
+
   useEffect(() => {
-    fetch(`${API_URL}/api/duty/case-types`)
-      .then(res => res.json())
-      .then((data: CaseTypesResponse) => {
-        setCommonCaseTypes(data.common || [])
-        setEconomicCaseTypes(data.economic || [])
-      })
-      .catch(() => {
-        setError('Не удалось загрузить типы дел. Убедитесь, что сервер запущен.')
-      })
-  }, [])
+    fetchCaseTypes()
+  }, [fetchCaseTypes])
+
+  useEffect(() => {
+    if (caseTypesData) {
+      setCommonCaseTypes(caseTypesData.common || [])
+      setEconomicCaseTypes(caseTypesData.economic || [])
+    }
+  }, [caseTypesData])
 
   const caseTypes = courtType === 'common' ? commonCaseTypes : economicCaseTypes
+  const displayError = caseTypesError || error
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setResult(null)
-    setLoading(true)
-
-    try {
-      const response = await fetch(`${API_URL}/api/duty/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          courtType,
-          caseType,
-          plaintiffType,
-          amount: amount ? parseFloat(amount) : undefined
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка расчёта')
-      }
-
-      setResult({
-        amount: data.amount,
-        baseValue: data.baseValue,
-        breakdown: data.breakdown
-      })
-    } catch (err) {
-      if (err instanceof TypeError && err.message.includes('fetch')) {
-        setError('Ошибка соединения с сервером. Убедитесь, что сервер запущен на порту 3000.')
-      } else {
-        setError(err instanceof Error ? err.message : 'Ошибка расчёта')
-      }
-    } finally {
-      setLoading(false)
-    }
+    await execute({
+      courtType,
+      caseType,
+      plaintiffType,
+      amount: amount ? parseFloat(amount) : undefined
+    })
   }
 
   return (
-    <div className="calculator">
+    <div className={styles.calculator}>
       <h2>Калькулятор государственной пошлины</h2>
       
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Тип суда</label>
+        <FormField label="Тип суда">
           <select value={courtType} onChange={(e) => { setCourtType(e.target.value); setCaseType('property') }}>
             {courtTypes.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
           </select>
-        </div>
+        </FormField>
 
-        <div className="form-group">
-          <label>Тип заявления</label>
+        <FormField label="Тип заявления">
           <select value={caseType} onChange={(e) => setCaseType(e.target.value)}>
             {caseTypes.map(ct => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
           </select>
-        </div>
+        </FormField>
 
-        <div className="form-group">
-          <label>Тип заявителя</label>
+        <FormField label="Тип заявителя">
           <select value={plaintiffType} onChange={(e) => setPlaintiffType(e.target.value)}>
             {plaintiffTypes.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
           </select>
-        </div>
+        </FormField>
 
         {['property', 'court_order'].includes(caseType) && (
-          <div className="form-group">
-            <label>Сумма иска (BYN)</label>
+          <FormField label="Сумма иска (BYN)">
             <input 
               type="number" 
               value={amount} 
@@ -132,23 +100,23 @@ export default function DutyCalculator() {
               min="0"
               step="0.01"
             />
-          </div>
+          </FormField>
         )}
 
-        <button type="submit" className="btn" disabled={loading}>
+        <button type="submit" className={styles.btn} disabled={loading}>
           {loading ? 'Расчёт...' : 'Рассчитать'}
         </button>
       </form>
 
-      {result && (
-        <div className="result">
-          <div className="result-label">Сумма государственной пошлины</div>
-          <div className="result-value">{result.amount} BYN</div>
-          <div className="result-breakdown">{result.breakdown}</div>
+      {dutyData && (
+        <div className={styles.result}>
+          <div className={styles.resultLabel}>Сумма государственной пошлины</div>
+          <div className={styles.resultValue}>{dutyData.amount} BYN</div>
+          <div className={styles.resultBreakdown}>{dutyData.breakdown}</div>
         </div>
       )}
 
-      {error && <div className="error">{error}</div>}
+      {displayError && <div className={styles.error}>{displayError}</div>}
     </div>
   )
 }

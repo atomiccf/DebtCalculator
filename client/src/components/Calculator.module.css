@@ -10,29 +10,29 @@
   color: #2c3e50;
 }
 
-.calculator-description {
+.calculatorDescription {
   color: #7f8c8d;
   font-size: 0.875rem;
   margin-bottom: 1.5rem;
 }
 
-.result-breakdown p {
+.resultBreakdown p {
   margin: 0.25rem 0;
 }
 
-.form-group {
+.formGroup {
   margin-bottom: 1rem;
 }
 
-.form-group label {
+.formGroup label {
   display: block;
   margin-bottom: 0.25rem;
   font-weight: 500;
   color: #34495e;
 }
 
-.form-group select,
-.form-group input {
+.formGroup input,
+.formGroup select {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid #ddd;
@@ -40,8 +40,8 @@
   font-size: 1rem;
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.formGroup input:focus,
+.formGroup select:focus {
   outline: none;
   border-color: #3498db;
 }
@@ -74,18 +74,18 @@
   border-radius: 4px;
 }
 
-.result-label {
+.resultLabel {
   color: #7f8c8d;
   font-size: 0.875rem;
 }
 
-.result-value {
+.resultValue {
   font-size: 1.5rem;
   font-weight: bold;
   color: #27ae60;
 }
 
-.result-breakdown {
+.resultBreakdown {
   margin-top: 0.5rem;
   color: #7f8c8d;
   font-size: 0.875rem;
@@ -96,19 +96,19 @@
   margin-top: 1rem;
 }
 
-.documents-header {
+.documentsHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
 }
 
-.documents-header span {
+.documentsHeader span {
   font-weight: 600;
   color: #2c3e50;
 }
 
-.btn-add {
+.btnAdd {
   background: #27ae60;
   color: white;
   border: none;
@@ -118,18 +118,18 @@
   font-size: 0.875rem;
 }
 
-.btn-add:hover {
+.btnAdd:hover {
   background: #219a52;
 }
 
-.documents-list {
+.documentsList {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
-.document-row {
+.documentRow {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -138,24 +138,21 @@
   border-radius: 4px;
 }
 
-.document-fields {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 0.5rem;
+.documentFields {
   flex: 1;
 }
 
-.document-fields .form-group {
+.documentFields .formGroup {
   margin-bottom: 0;
 }
 
-.document-fields .form-group label {
+.documentFields .formGroup label {
   font-size: 0.75rem;
   color: #7f8c8d;
   margin-bottom: 0.125rem;
 }
 
-.btn-remove {
+.btnRemove {
   background: #e74c3c;
   color: white;
   border: none;
@@ -167,7 +164,7 @@
   line-height: 1;
 }
 
-.btn-remove:hover {
+.btnRemove:hover {
   background: #c0392b;
 }
 
@@ -175,36 +172,36 @@
   margin-top: 1.5rem;
 }
 
-.results-table {
+.resultsTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
 
-.results-table th,
-.results-table td {
+.resultsTable th,
+.resultsTable td {
   padding: 0.5rem;
   text-align: left;
   border-bottom: 1px solid #ddd;
 }
 
-.results-table th {
+.resultsTable th {
   background: #ecf0f1;
   font-weight: 600;
   color: #2c3e50;
 }
 
-.results-table td {
+.resultsTable td {
   color: #34495e;
 }
 
-.total-row td {
+.totalRow td {
   font-weight: 700;
   color: #27ae60;
   background: #f8f9fa;
 }
 
-.results-summary {
+.resultsSummary {
   margin-top: 0.75rem;
   color: #7f8c8d;
   font-size: 0.875rem;

@@ -10,6 +10,7 @@ export interface PenaltyResult {
   penalty: number;
   rate: number;
   breakdown: PenaltyPeriod[];
+  yearDivisor: number;
 }
 
 export interface PenaltyPeriod {
@@ -21,6 +22,30 @@ export interface PenaltyPeriod {
 }
 
 const DEFAULT_RATE = 0.1;
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+
+function isLeapYearInPeriod(startDate: Date, endDate: Date): boolean {
+  const startYear = startDate.getFullYear();
+  const endYear = endDate.getFullYear();
+  
+  if (startYear === endYear) {
+    return isLeapYear(startYear);
+  }
+  
+  for (let year = startYear; year <= endYear; year++) {
+    if (isLeapYear(year)) {
+      const leapYearStart = new Date(year, 1, 29);
+      if (leapYearStart >= startDate && leapYearStart <= endDate) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
 
 export function calculatePenalty(input: PenaltyInput): PenaltyResult {
   const { debt, startDate, endDate, rate = DEFAULT_RATE } = input;
@@ -45,12 +70,14 @@ export function calculatePenalty(input: PenaltyInput): PenaltyResult {
   }
   
   const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const penalty = (debt * rate * totalDays) / 100;
+  const yearDivisor = isLeapYearInPeriod(start, end) ? 366 : 365;
+  const penalty = (debt * rate * totalDays) / (100 * yearDivisor);
   
   return {
     days: totalDays,
     penalty: Math.round(penalty * 100) / 100,
     rate,
+    yearDivisor,
     breakdown: [{
       startDate: start.toISOString().split('T')[0],
       endDate: end.toISOString().split('T')[0],
@@ -93,7 +120,8 @@ export function calculatePenaltyWithRateChange(
     if (periodEnd < periodStart) continue;
     
     const days = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const periodPenalty = (debt * rateInfo.rate * days) / 100;
+    const periodYearDivisor = isLeapYearInPeriod(periodStart, periodEnd) ? 366 : 365;
+    const periodPenalty = (debt * rateInfo.rate * days) / (100 * periodYearDivisor);
     totalPenalty += periodPenalty;
     
     breakdown.push({
@@ -110,7 +138,8 @@ export function calculatePenaltyWithRateChange(
   if (currentDate <= end) {
     const lastRate = sortedRates[sortedRates.length - 1].rate;
     const days = Math.ceil((end.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const periodPenalty = (debt * lastRate * days) / 100;
+    const periodYearDivisor = isLeapYearInPeriod(currentDate, end) ? 366 : 365;
+    const periodPenalty = (debt * lastRate * days) / (100 * periodYearDivisor);
     totalPenalty += periodPenalty;
     
     breakdown.push({
@@ -123,11 +152,13 @@ export function calculatePenaltyWithRateChange(
   }
   
   const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  
+  const yearDivisor = isLeapYearInPeriod(start, end) ? 366 : 365;
+
   return {
     days: totalDays,
     penalty: Math.round(totalPenalty * 100) / 100,
     rate: sortedRates[0].rate,
+    yearDivisor,
     breakdown
   };
 }
@@ -137,12 +168,17 @@ export function calculateInterestOnDebt(
   startDate: Date | string,
   endDate: Date | string,
   annualRate: number
-): number {
+): { interest: number; days: number; yearDivisor: number } {
   const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
   const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
   
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const interest = (debt * annualRate * days) / (100 * 365);
+  const yearDivisor = isLeapYearInPeriod(start, end) ? 366 : 365;
+  const interest = (debt * annualRate * days) / (100 * yearDivisor);
   
-  return Math.round(interest * 100) / 100;
+  return {
+    interest: Math.round(interest * 100) / 100,
+    days,
+    yearDivisor
+  };
 }

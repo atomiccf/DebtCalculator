@@ -154,14 +154,16 @@ app.post('/api/penalty/calculate', (req: Request, res: Response) => {
     }
 
     if (annualRate) {
-      const interest = calculateInterestOnDebt(debt, startDate, endDate, annualRate);
+      const interestResult = calculateInterestOnDebt(debt, startDate, endDate, annualRate);
       res.json({
         type: 'interest',
         debt,
         startDate,
         endDate,
         annualRate,
-        amount: interest
+        amount: interestResult.interest,
+        days: interestResult.days,
+        yearDivisor: interestResult.yearDivisor
       });
     } else {
       const result = calculatePenalty({ debt, startDate, endDate, rate });
@@ -205,11 +207,15 @@ app.post('/api/penalty/calculate-multiple', (req: Request, res: Response) => {
       }
 
       let docPenalty: number;
+      let docYearDivisor: number;
       if (annualRate) {
-        docPenalty = calculateInterestOnDebt(doc.debt, doc.startDate, doc.endDate, annualRate);
+        const interestResult = calculateInterestOnDebt(doc.debt, doc.startDate, doc.endDate, annualRate);
+        docPenalty = interestResult.interest;
+        docYearDivisor = interestResult.yearDivisor;
       } else {
         const result = calculatePenalty({ debt: doc.debt, startDate: doc.startDate, endDate: doc.endDate, rate: rateValue });
         docPenalty = result.penalty;
+        docYearDivisor = result.yearDivisor;
       }
 
       const start = new Date(doc.startDate);

@@ -16,6 +16,7 @@ import {
   DutyCalculationResult,
   CaseType
 } from 'jurist-calculator-shared';
+import { fetchRefinancingRate } from 'jurist-calculator-shared';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,11 +99,51 @@ app.get('/api/rates/base-value', (req: Request, res: Response) => {
   res.json(getBaseValueInfo(date));
 });
 
-app.get('/api/rates/refinancing', (_req: Request, res: Response) => {
-  res.json({ 
-    value: getCurrentRefinancingRate(),
-    type: 'annual'
-  });
+app.get('/api/rates/current', async (_req: Request, res: Response) => {
+  try {
+    const refinancing = await fetchRefinancingRate();
+    const baseValue = getBaseValueInfo();
+    
+    res.json({
+      baseValue: baseValue.value,
+      baseValueDate: baseValue.dateFrom,
+      baseValueAct: baseValue.act,
+      refinancingRate: refinancing.rate,
+      refinancingRateDate: refinancing.date,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    const fallbackRefinancing = getCurrentRefinancingRate();
+    const baseValue = getBaseValueInfo();
+    
+    res.json({
+      baseValue: baseValue.value,
+      baseValueDate: baseValue.dateFrom,
+      baseValueAct: baseValue.act,
+      refinancingRate: fallbackRefinancing,
+      refinancingRateDate: 'fallback',
+      updatedAt: new Date().toISOString(),
+      fallback: true
+    });
+  }
+});
+
+app.get('/api/rates/refinancing', async (_req: Request, res: Response) => {
+  try {
+    const result = await fetchRefinancingRate();
+    res.json({ 
+      value: result.rate,
+      date: result.date,
+      type: 'annual'
+    });
+  } catch (error) {
+    res.json({ 
+      value: getCurrentRefinancingRate(),
+      date: 'fallback',
+      type: 'annual',
+      fallback: true
+    });
+  }
 });
 
 app.post('/api/penalty/calculate', (req: Request, res: Response) => {

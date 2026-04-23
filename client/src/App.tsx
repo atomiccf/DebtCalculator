@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import DutyCalculator from './components/DutyCalculator'
 import PenaltyCalculator from './components/PenaltyCalculator'
@@ -6,8 +6,36 @@ import Interest366Calculator from './components/Interest366Calculator'
 
 type Tab = 'duty' | 'penalty' | 'interest366'
 
+interface CurrentRates {
+  baseValue: number
+  baseValueDate: string
+  baseValueAct: string
+  refinancingRate: number
+  refinancingRateDate: string
+  updatedAt: string
+  fallback?: boolean
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('duty')
+  const [rates, setRates] = useState<CurrentRates | null>(null)
+
+  useEffect(() => {
+    fetch('/api/rates/current')
+      .then(res => res.json())
+      .then(data => setRates(data))
+      .catch(() => {
+        setRates({
+          baseValue: 45,
+          baseValueDate: '2026-01-01',
+          baseValueAct: 'fallback',
+          refinancingRate: 9.75,
+          refinancingRateDate: 'fallback',
+          updatedAt: new Date().toISOString(),
+          fallback: true
+        })
+      })
+  }, [])
 
   return (
     <div className="app">

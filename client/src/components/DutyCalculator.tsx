@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import styles from '../components/Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { FormField } from '../components/ui'
@@ -21,10 +21,19 @@ const courtTypes = [
   { value: 'supreme_economic', label: 'Судебная коллегия по экономическим делам ВС РБ' },
 ]
 
-const plaintiffTypes = [
+const commonPlaintiffTypes = [
   { value: 'individual', label: 'Физическое лицо' },
-  { value: 'organization', label: 'Юридическое лицо' },
 ]
+
+const economicPlaintiffTypes = [
+  { value: 'organization', label: 'Юридическое лицо' },
+  { value: 'ip', label: 'Индивидуальный предприниматель' },
+]
+
+const economicCaseTypeFilters: Record<string, string[]> = {
+  organization: ['property', 'property_quality', 'non_property_org', 'subsidiary', 'appeal', 'cassation', 'supervision', 'court_order', 'bankruptcy', 'fact_establishment', 'challenge_act', 'other_complaint'],
+  ip: ['property', 'property_quality', 'non_property_ip', 'subsidiary', 'appeal', 'cassation', 'supervision', 'court_order', 'bankruptcy', 'fact_establishment', 'challenge_act', 'other_complaint'],
+}
 
 interface CaseTypesResponse {
   common: CaseType[]
@@ -32,9 +41,9 @@ interface CaseTypesResponse {
 }
 
 export default function DutyCalculator() {
-  const [courtType, setCourtType] = useState('common')
+  const [courtType, setCourtType] = useState<'common' | 'economic' | 'supreme_economic'>('common')
   const [caseType, setCaseType] = useState('property')
-  const [plaintiffType, setPlaintiffType] = useState('individual')
+  const [plaintiffType, setPlaintiffType] = useState<'individual' | 'organization' | 'ip'>('individual')
   const [amount, setAmount] = useState('')
   
   const [commonCaseTypes, setCommonCaseTypes] = useState<CaseType[]>([])
@@ -54,7 +63,35 @@ export default function DutyCalculator() {
     }
   }, [caseTypesData])
 
-  const caseTypes = courtType === 'common' ? commonCaseTypes : economicCaseTypes
+  useEffect(() => {
+    if (courtType === 'common') {
+      setPlaintiffType('individual')
+    } else if (courtType === 'economic' || courtType === 'supreme_economic') {
+      setPlaintiffType('organization')
+    }
+  }, [courtType])
+
+  const baseCaseTypes = courtType === 'common' ? commonCaseTypes : economicCaseTypes
+  
+  const filteredCaseTypes = useMemo(() => {
+    if (courtType === 'common') {
+      return baseCaseTypes
+    }
+    const allowed = economicCaseTypeFilters[plaintiffType]
+    if (!allowed) return baseCaseTypes
+    return baseCaseTypes.filter(ct => allowed.includes(ct.id))
+  }, [courtType, plaintiffType, baseCaseTypes])
+
+  useEffect(() => {
+    if (courtType === 'common') return
+    const allowed = economicCaseTypeFilters[plaintiffType] || []
+    const allowedIds = baseCaseTypes.filter(ct => allowed.includes(ct.id)).map(ct => ct.id)
+    if (!allowedIds.includes(caseType)) {
+      setCaseType(allowedIds[0] || 'property')
+    }
+  }, [plaintiffType, baseCaseTypes, courtType])
+
+  const currentPlaintiffTypes = courtType === 'common' ? commonPlaintiffTypes : economicPlaintiffTypes
   const displayError = caseTypesError || error
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,20 +110,20 @@ export default function DutyCalculator() {
       
       <form onSubmit={handleSubmit}>
         <FormField label="Тип суда">
-          <select value={courtType} onChange={(e) => { setCourtType(e.target.value); setCaseType('property') }}>
+          <select value={courtType} onChange={(e) => { setCourtType(e.target.value as 'common' | 'economic' | 'supreme_economic'); setCaseType('property') }}>
             {courtTypes.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
           </select>
         </FormField>
 
         <FormField label="Тип заявления">
           <select value={caseType} onChange={(e) => setCaseType(e.target.value)}>
-            {caseTypes.map(ct => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
+            {filteredCaseTypes.map(ct => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
           </select>
         </FormField>
 
         <FormField label="Тип заявителя">
-          <select value={plaintiffType} onChange={(e) => setPlaintiffType(e.target.value)}>
-            {plaintiffTypes.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
+          <select value={plaintiffType} onChange={(e) => setPlaintiffType(e.target.value as 'individual' | 'organization' | 'ip')}>
+            {currentPlaintiffTypes.map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
           </select>
         </FormField>
 

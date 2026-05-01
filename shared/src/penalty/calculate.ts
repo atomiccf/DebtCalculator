@@ -43,17 +43,17 @@ function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate
 
 export function calculatePenalty(input: PenaltyInput): PenaltyResult {
   const { debt, startDate, endDate, rate = DEFAULT_RATE } = input;
-  
+
   if (debt <= 0) {
     throw new Error('Сумма долга должна быть больше 0');
   }
-  
+
   const start = parseDate(startDate);
   const end = parseDate(endDate);
-  
+
   const totalDays = start.until(end).days + 1;
   const penalty = (debt * rate * totalDays) / 100;
-  
+
   return {
     days: totalDays,
     penalty: Math.round(penalty * 100) / 100,
@@ -78,34 +78,34 @@ export function calculatePenaltyWithRateChange(
   if (debt <= 0) {
     throw new Error('Сумма долга должна быть больше 0');
   }
-  
+
   const start = parseDate(startDate);
   const end = parseDate(endDate);
-  
-  const sortedRates = [...rates].sort((a, b) => 
+
+  const sortedRates = [...rates].sort((a, b) =>
     Temporal.PlainDate.from(a.dateFrom).since(start).days - Temporal.PlainDate.from(b.dateFrom).since(start).days
   );
-  
+
   let currentDate = start;
   let totalPenalty = 0;
   const breakdown: PenaltyPeriod[] = [];
-  
+
   for (const rateInfo of sortedRates) {
     const rateDate = Temporal.PlainDate.from(rateInfo.dateFrom);
-    
+
     if (rateDate.since(end).days > 0) break;
-    
+
     const periodStart = currentDate.since(start).days > 0 ? currentDate : start;
-    const periodEnd = rateDate.since(end).days <= 0 
+    const periodEnd = rateDate.since(end).days <= 0
       ? rateDate.subtract({ days: 1 })
       : end;
-    
+
     if (periodEnd.since(periodStart).days < 0) continue;
-    
+
     const days = periodStart.until(periodEnd).days + 1;
     const periodPenalty = (debt * rateInfo.rate * days) / 100;
     totalPenalty += periodPenalty;
-    
+
     breakdown.push({
       startDate: periodStart.toString(),
       endDate: periodEnd.toString(),
@@ -113,16 +113,16 @@ export function calculatePenaltyWithRateChange(
       rate: rateInfo.rate,
       amount: Math.round(periodPenalty * 100) / 100
     });
-    
+
     currentDate = rateDate;
   }
-  
+
   if (currentDate.since(end).days <= 0) {
     const lastRate = sortedRates[sortedRates.length - 1].rate;
     const days = currentDate.until(end).days + 1;
     const periodPenalty = (debt * lastRate * days) / 100;
     totalPenalty += periodPenalty;
-    
+
     breakdown.push({
       startDate: currentDate.toString(),
       endDate: end.toString(),
@@ -131,9 +131,9 @@ export function calculatePenaltyWithRateChange(
       amount: Math.round(periodPenalty * 100) / 100
     });
   }
-  
+
   const totalDays = start.until(end).days + 1;
-  
+
   return {
     days: totalDays,
     penalty: Math.round(totalPenalty * 100) / 100,
@@ -151,16 +151,16 @@ export function calculateInterestOnDebt(
 ): number {
   const start = parseDate(startDate);
   const end = parseDate(endDate);
-  
+
   const days = start.until(end).days + 1;
-  
+
   // Простая проверка високосного года
   const year = start.year;
   const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   const yearDivisor = isLeapYear ? 366 : 365;
-  
+
   const interest = (debt * annualRate * days) / (100 * yearDivisor);
-  
+
   return Math.round(interest * 100) / 100;
 }
 
@@ -181,18 +181,18 @@ export interface Interest366Result {
 
 export function calculateInterest366(input: Interest366Input): Interest366Result {
   const { debt, startDate, endDate } = input;
-  
+
   if (debt <= 0) {
     throw new Error('Сумма долга должна быть больше 0');
   }
-  
+
   const start = parseDate(startDate);
   const end = parseDate(endDate);
-  
+
   const days = start.until(end).days + 1;
   const refinancingRate = getRefinancingRate(end.toString());
   const interest = (debt * refinancingRate * days) / (100 * 366);
-  
+
   return {
     debt,
     startDate: start.toString(),

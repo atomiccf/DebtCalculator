@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import { getYearDivisorForPeriod } from './utils/dateUtils';
 import {
   calculateCommonCourtDuty,
   calculateEconomicCourtDuty,
@@ -169,7 +170,7 @@ app.post('/api/penalty/calculate', (req: Request, res: Response) => {
         annualRate,
         amount,
         days,
-        yearDivisor: 365
+        yearDivisor: getYearDivisorForPeriod(startDate, endDate)
       });
     } else {
       const result = calculatePenalty({ debt, startDate, endDate, rate });
@@ -216,7 +217,7 @@ app.post('/api/penalty/calculate-multiple', (req: Request, res: Response) => {
       let docYearDivisor: number;
       if (annualRate) {
         docPenalty = calculateInterestOnDebt(doc.debt, doc.startDate, doc.endDate, annualRate);
-        docYearDivisor = 365;
+        docYearDivisor = getYearDivisorForPeriod(doc.startDate, doc.endDate);
       } else {
         const result = calculatePenalty({ debt: doc.debt, startDate: doc.startDate, endDate: doc.endDate, rate: rateValue });
         docPenalty = result.penalty;

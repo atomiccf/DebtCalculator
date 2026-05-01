@@ -20,7 +20,7 @@ const emptyDocument: Document = {
 }
 
 export function useDocuments(options?: UseDocumentsOptions) {
-  const initialCount = options?.initialCount ?? 2
+  const initialCount = options?.initialCount ?? 1
   const [documents, setDocuments] = useState<Document[]>(
     Array(initialCount).fill(null).map(() => ({ ...emptyDocument }))
   )

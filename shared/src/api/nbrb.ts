@@ -1,14 +1,14 @@
 import { Temporal } from '@js-temporal/polyfill';
 
-const NBRB_API = 'https://api.nbrb.by/refinancingrate';
-
 export interface RefinancingRateResponse {
   Date: string;
   Value: number;
 }
 
-let rateCache: { rate: number; date: string; timestamp: number } | null = null;
-const CACHE_TTL = 60 * 60 * 1000;
+export interface RefinancingRateInfo {
+  rate: number;
+  date: string;
+}
 
 function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
   if (date instanceof Date) {
@@ -24,49 +24,18 @@ function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate
   return date;
 }
 
-export async function fetchRefinancingRate(date?: string): Promise<{ rate: number; date: string }> {
-  const now = Date.now();
+export function createRefinancingRateService() {
+  return {
+    async fetchRefinancingRate(date?: string): Promise<RefinancingRateInfo> {
+      throw new Error('External API calls are not available in shared module. Use server API endpoints instead.');
+    },
 
-  if (rateCache && now - rateCache.timestamp < CACHE_TTL) {
-    return { rate: rateCache.rate, date: rateCache.date };
-  }
-
-  try {
-    const url = date 
-      ? `${NBRB_API}?ondate=${date}`
-      : NBRB_API;
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`NBRB API error: ${response.status}`);
+    async getRefinancingRateForDate(
+      inputDate: Temporal.PlainDate | Date | string
+    ): Promise<RefinancingRateInfo> {
+      throw new Error('External API calls are not available in shared module. Use server API endpoints instead.');
     }
-    
-    const data = await response.json() as RefinancingRateResponse[];
-    
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Empty response from NBRB API');
-    }
-
-    const latest = data[0];
-    
-    rateCache = {
-      rate: latest.Value,
-      date: latest.Date,
-      timestamp: now
-    };
-    
-    return { rate: latest.Value, date: latest.Date };
-    
-  } catch (error) {
-    console.error('NBRB API fetch error:', error);
-    throw error;
-  }
+  };
 }
 
-export async function getRefinancingRateForDate(
-  inputDate: Temporal.PlainDate | Date | string
-): Promise<{ rate: number; date: string }> {
-  const date = parseDate(inputDate);
-  return fetchRefinancingRate(date.toString());
-}
+export type RefinancingRateService = ReturnType<typeof createRefinancingRateService>;

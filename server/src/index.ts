@@ -16,7 +16,7 @@ import {
   DutyCalculationResult,
   CaseType
 } from 'jurist-calculator-shared';
-import { fetchRefinancingRate } from 'jurist-calculator-shared';
+import { nbrbService } from './services/nbrbService';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -101,7 +101,7 @@ app.get('/api/rates/base-value', (req: Request, res: Response) => {
 
 app.get('/api/rates/current', async (_req: Request, res: Response) => {
   try {
-    const refinancing = await fetchRefinancingRate();
+    const refinancing = await nbrbService.fetchRefinancingRate();
     const baseValue = getBaseValueInfo();
     
     res.json({
@@ -130,7 +130,7 @@ app.get('/api/rates/current', async (_req: Request, res: Response) => {
 
 app.get('/api/rates/refinancing', async (_req: Request, res: Response) => {
   try {
-    const result = await fetchRefinancingRate();
+    const result = await nbrbService.fetchRefinancingRate();
     res.json({ 
       value: result.rate,
       date: result.date,
@@ -156,16 +156,20 @@ app.post('/api/penalty/calculate', (req: Request, res: Response) => {
     }
 
     if (annualRate) {
-      const interestResult = calculateInterestOnDebt(debt, startDate, endDate, annualRate);
+      const amount = calculateInterestOnDebt(debt, startDate, endDate, annualRate);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      
       res.json({
         type: 'interest',
         debt,
         startDate,
         endDate,
         annualRate,
-        amount: interestResult.interest,
-        days: interestResult.days,
-        yearDivisor: interestResult.yearDivisor
+        amount,
+        days,
+        yearDivisor: 365
       });
     } else {
       const result = calculatePenalty({ debt, startDate, endDate, rate });
@@ -211,9 +215,8 @@ app.post('/api/penalty/calculate-multiple', (req: Request, res: Response) => {
       let docPenalty: number;
       let docYearDivisor: number;
       if (annualRate) {
-        const interestResult = calculateInterestOnDebt(doc.debt, doc.startDate, doc.endDate, annualRate);
-        docPenalty = interestResult.interest;
-        docYearDivisor = interestResult.yearDivisor;
+        docPenalty = calculateInterestOnDebt(doc.debt, doc.startDate, doc.endDate, annualRate);
+        docYearDivisor = 365;
       } else {
         const result = calculatePenalty({ debt: doc.debt, startDate: doc.startDate, endDate: doc.endDate, rate: rateValue });
         docPenalty = result.penalty;

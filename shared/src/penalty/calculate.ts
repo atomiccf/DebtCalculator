@@ -1,5 +1,6 @@
 import { Temporal } from '@js-temporal/polyfill';
 import { getRefinancingRate } from '../api/refinancingRate';
+import { getDaysInYearForDate } from '../utils/dateUtils';
 
 export interface PenaltyInput {
   debt: number;
@@ -191,7 +192,8 @@ export function calculateInterest366(input: Interest366Input): Interest366Result
 
   const days = start.until(end).days + 1;
   const refinancingRate = getRefinancingRate(end.toString());
-  const interest = (debt * refinancingRate * days) / (100 * 366);
+  const yearDivisor = getDaysInYearForDate(end);
+  const interest = (debt * refinancingRate * days) / (100 * yearDivisor);
 
   return {
     debt,
@@ -246,7 +248,8 @@ export function calculateInterest366Multiple(documents: Interest366Document[]): 
 
     const days = start.until(end).days + 1;
     const refinancingRate = getRefinancingRate(end.toString());
-    const interest = (doc.debt * refinancingRate * days) / (100 * 365);
+    const yearDivisor = getDaysInYearForDate(end);
+    const interest = (doc.debt * refinancingRate * days) / (100 * yearDivisor);
 
     results.push({
       name: doc.name,

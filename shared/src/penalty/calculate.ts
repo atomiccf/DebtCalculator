@@ -153,7 +153,13 @@ export function calculateInterestOnDebt(
   const end = parseDate(endDate);
   
   const days = start.until(end).days + 1;
-  const interest = (debt * annualRate * days) / (100 * 365);
+  
+  // Простая проверка високосного года
+  const year = start.year;
+  const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const yearDivisor = isLeapYear ? 366 : 365;
+  
+  const interest = (debt * annualRate * days) / (100 * yearDivisor);
   
   return Math.round(interest * 100) / 100;
 }
@@ -185,7 +191,7 @@ export function calculateInterest366(input: Interest366Input): Interest366Result
   
   const days = start.until(end).days + 1;
   const refinancingRate = getRefinancingRate(end.toString());
-  const interest = (debt * refinancingRate * days) / (100 * 365);
+  const interest = (debt * refinancingRate * days) / (100 * 366);
   
   return {
     debt,

@@ -10,6 +10,8 @@ services:
     volumes:
       - ./server:/app/server
       - ./shared:/app/shared
+      - /app/server/node_modules
+      - /app/shared/node_modules
     working_dir: /app
     command: cd server && npm run dev
     environment:
@@ -24,7 +26,7 @@ services:
       - "5173:5173"
     volumes:
       - ./client:/app/client
-      - ./shared:/app/shared
+      - /app/client/node_modules
     working_dir: /app
     command: cd client && npm run dev
     environment:

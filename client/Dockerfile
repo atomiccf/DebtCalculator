@@ -2,14 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+COPY package.json package-lock.json ./
 COPY shared/package*.json ./shared/
+COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 
-WORKDIR /app/client
-RUN npm install
+RUN npm ci --workspace client
 
-COPY client/ .
-COPY shared/ ../shared/
+COPY client/ ./client/
 
 WORKDIR /app/client
 

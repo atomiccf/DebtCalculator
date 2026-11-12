@@ -4,14 +4,15 @@
   "description": "Express API для калькулятора госпошлины",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only --watch ../shared/src --require ../scripts/build-shared.cjs src/index.ts",
+    "prebuild": "node ../scripts/build-shared.cjs",
     "build": "tsc",
     "start": "node dist/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "jurist-calculator-shared": "file:../shared",
+    "jurist-calculator-shared": "1.0.0",
     "@js-temporal/polyfill": "^0.5.1"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { DateInput, parsePeriod, splitPeriodByYear, getDaysInYearForDate } from '../utils/dateUtils';
 import { calculateMoneyAccrual } from '../utils/money';
-import { assertRecord } from '../utils/validation';
+import { assertRecord, assertPositiveNumber } from '../utils/validation';
 
 export const CALCULATION_RULES_VERSION = '2.1.0';
 export const ACCRUAL_RULES = Object.freeze({
@@ -39,6 +39,7 @@ export interface AnnualAccrualResult extends AccrualResult {
 
 export function calculateDailyAccrual(input: AccrualInput): AccrualResult {
   assertRecord(input);
+  assertPositiveNumber(input.rate, 'Дневная пеня');
   const { start, end, days } = parsePeriod(input.startDate, input.endDate);
   return { debt: input.debt, rate: input.rate, startDate: start.toString(), endDate: end.toString(),
     amount: calculateMoneyAccrual(input.debt, input.rate, BigInt(days)), days,

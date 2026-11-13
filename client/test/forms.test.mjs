@@ -166,7 +166,7 @@ test('money remains text and invalid amounts never reach the API', async () => {
     await mount(Component)
     if (Component !== DutyCalculator) {
       await fillDocument()
-      if (Component === PenaltyCalculator) await set('Ставка, % в день', '0,01')
+      if (Component === PenaltyCalculator) await set('Размер пени, % в день', '0,01')
     }
     for (const value of ['12,', '12abc', '1.234', '0', '1e3']) {
       const input = Component === DutyCalculator ? field('Сумма требования (BYN)')
@@ -182,17 +182,22 @@ test('money remains text and invalid amounts never reach the API', async () => {
   }
 })
 
-test('penalty requires an explicit daily rate, accepts zero and adds/removes documents', async () => {
+test('penalty requires a positive daily amount, reports zero and adds/removes documents', async () => {
   await mount(PenaltyCalculator)
   await fillDocument()
-  assert.equal(field('Ставка, % в день').props.required, true)
+  assert.equal(field('Размер пени, % в день').props.required, true)
   await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }))
   assert.equal(calls.length, 0)
-  await set('Ставка, % в день', '0')
-  assert.equal((await submit()).response.total, 0)
-  await set('Ставка, % в день', '0,0001')
-  assert.match(text(), /Результат устарел/)
+  for (const value of ['0', '0,0', '0.0000', '-0.1', 'abc']) {
+    await set('Размер пени, % в день', value)
+    await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }))
+    assert.equal(calls.length, 0)
+    assert.equal(renderer.root.findAllByType('div').find(node => node.children.includes('введите корректный размер пени')).children[0], 'введите корректный размер пени')
+  }
+  await set('Размер пени, % в день', '0,0001')
+  assert.doesNotMatch(text(), /введите корректный размер пени/)
   assert.equal((await submit()).request.rate, 0.0001)
+  assert.match(text(), /Размер пени:/)
   await act(async () => renderer.root.findAllByType('button').find(node => node.children.includes('+ Добавить документ')).props.onClick())
   assert.match(text(), /Результат устарел/)
   await fillDocument(2, '200.75')
@@ -202,44 +207,66 @@ test('penalty requires an explicit daily rate, accepts zero and adds/removes doc
   assert.equal((await submit()).request.documents[0].debt, 200.75)
 })
 
-test('Article 366 supports every basis, divisor, penalty exception and explicit zero rate', async () => {
+test('Article 366 selects the rate on each document end date without extra fields', async () => {
   await mount(Interest366Calculator)
-  await fillDocument()
-  for (const basis of options('Основание расчёта')) {
-    await set('Основание расчёта', basis)
-    if (basis !== 'estimate') {
-      assert.equal(field('Дата выбора ставки (дата оплаты, решения или надписи)').props.required, true)
-      await set('Дата выбора ставки (дата оплаты, решения или надписи)', '2026-06-01')
-    }
-    for (const divisor of options('Методика годового делителя')) {
-      await set('Методика годового делителя', String(divisor))
-      assert.equal((await submit()).request.calculationBasis, basis)
-    }
-  }
-  await set('Установлена неустойка', 'yes')
-  const exception = renderer.root.findByProps({ type: 'checkbox' })
-  assert.equal(exception.props.required, true)
-  const count = calls.length
-  await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }))
-  assert.equal(calls.length, count)
-  await change(exception, true)
-  await set('Явная годовая ставка (%), если задана отдельно', '0')
+  assert.doesNotMatch(text(), /Дата ставки рефинансирования|Основание расчёта|Другая ставка по договору или законодательству|Годовая ставка \(%\)|Установлена неустойка|Установлено законодательное исключение/)
+  await fillDocument(1, '100000')
+  await change(renderer.root.findByProps({ 'aria-label': 'Документ 1: первый день просрочки' }), '2026-05-31')
+  await act(async () => renderer.root.findAllByType('button').find(node => node.children.includes('+ Добавить документ')).props.onClick())
+  await fillDocument(2, '100000')
+  await change(renderer.root.findByProps({ 'aria-label': 'Документ 2: первый день просрочки' }), '2026-05-31')
+  await change(renderer.root.findByProps({ 'aria-label': 'Документ 2: последний день просрочки' }), '2026-06-01')
   const call = await submit()
-  assert.equal(call.request.statutoryException, true)
-  assert.equal(call.request.refinancingRate, 0)
-  assert.equal(call.response.total, 0)
+  assert.equal(call.request.rateDate, undefined)
+  assert.equal(call.request.calculationBasis, 'estimate')
+  assert.equal(call.request.dayCount, 'actual/actual')
+  assert.equal(call.request.hasPenalty, false)
+  assert.equal(call.request.statutoryException, undefined)
+  assert.equal(call.request.refinancingRate, undefined)
+  assert.deepEqual(call.response.results.map(row => [row.rateDate, row.refinancingRate, row.interest]), [
+    ['2026-05-31', 9.75, 26.71], ['2026-06-01', 9.25, 50.68],
+  ])
+  for (const row of call.response.results) {
+    assert.equal(row.referenceData.refinancingRate.origin, 'reference')
+    assert.equal(row.referenceData.refinancingRate.selectedOn, row.endDate)
+  }
+  assert.equal(call.response.total, 77.39)
 })
 
-test('estimate warnings are visible; a multi-year period requires an explicit divisor', async () => {
+test('Article 366 automatically accounts for leap years without a divisor field', async () => {
   await mount(Interest366Calculator)
-  await fillDocument()
+  await fillDocument(1, '100000')
   await submit()
   assert.match(text(), /Предупреждения/)
-  await change(renderer.root.findByProps({ 'aria-label': 'Документ 1: последний день просрочки' }), '2027-01-01')
-  assert.equal(field('Методика годового делителя').props.required, true)
-  await set('Методика годового делителя', 'actual/actual')
-  await set('Явная годовая ставка (%), если задана отдельно', '9,25')
-  await submit()
+  assert.doesNotMatch(text(), /Методика годового делителя/)
+  assert.match(text(), /Дней в году/)
+  assert.match(text(), /2026 — 365/)
+  await change(renderer.root.findByProps({ 'aria-label': 'Документ 1: первый день просрочки' }), '2023-12-31')
+  await change(renderer.root.findByProps({ 'aria-label': 'Документ 1: последний день просрочки' }), '2024-01-02')
+  const call = await submit()
+  assert.equal(call.request.refinancingRate, undefined)
+  assert.equal(call.response.results[0].refinancingRate, 9.5)
+  assert.equal(call.response.results[0].days, 3)
+  // One day / 365 + two days / 366, at the same 9.5% rate.
+  assert.equal(call.response.total, 77.94)
+  assert.match(text(), /2023 — 365; 2024 — 366/)
+})
+
+test('Article 366 applies the end-date rate to the entire period and updates after edits', async () => {
+  await mount(Interest366Calculator)
+  await fillDocument(1, '100000')
+  await change(renderer.root.findByProps({ 'aria-label': 'Документ 1: первый день просрочки' }), '2026-05-31')
+  for (const [date, rate, total] of [['2026-05-31', 9.75, 26.71], ['2026-06-01', 9.25, 50.68]]) {
+    await change(renderer.root.findByProps({ 'aria-label': 'Документ 1: последний день просрочки' }), date)
+    if (calls.length) assert.match(text(), /Результат устарел/)
+    const call = await submit()
+    assert.equal(call.request.rateDate, undefined)
+    assert.equal(call.request.refinancingRate, undefined)
+    assert.equal(call.response.results[0].rateDate, date)
+    assert.equal(call.response.results[0].refinancingRate, rate)
+    assert.equal(call.response.results[0].referenceData.refinancingRate.origin, 'reference')
+    assert.equal(call.response.total, total)
+  }
 })
 
 test('results become stale after edits, including edits while a response is pending', async () => {
@@ -248,7 +275,7 @@ test('results become stale after edits, including edits while a response is pend
     if (Component === DutyCalculator) await set('Сумма требования (BYN)', '1000')
     else {
       await fillDocument()
-      if (Component === PenaltyCalculator) await set('Ставка, % в день', '0.01')
+      if (Component === PenaltyCalculator) await set('Размер пени, % в день', '0.01')
     }
     await submit()
     assert.doesNotMatch(text(), /Результат устарел/)

@@ -15,7 +15,7 @@ test('daily penalty preserves inclusive days and the legacy response shape', () 
     breakdown: [{ startDate: period.startDate, endDate: period.endDate, days: 20, rate: 0.1, amount: 20 }],
   });
   assert.equal(api.calculatePenalty({ ...period, endDate: period.startDate }).days, 1);
-  assert.equal(api.calculatePenalty({ ...period, rate: 0 }).penalty, 0);
+  assert.throws(() => api.calculatePenalty({ ...period, rate: 0 }));
 });
 
 test('money uses decimal half-up rounding and exact aggregation', () => {
@@ -30,7 +30,7 @@ test('accrual rejects invalid money, rates and periods at the core boundary', ()
   for (const debt of [undefined, '100', 0, -1, 1.001, Number.MAX_SAFE_INTEGER]) {
     assert.throws(() => api.calculateDailyAccrual({ ...period, debt }), `debt: ${debt}`);
   }
-  for (const rate of [null, '0.1', NaN, Infinity, -0.1]) {
+  for (const rate of [null, '0.1', NaN, Infinity, 0, -0.1]) {
     assert.throws(() => api.calculateDailyAccrual({ ...period, rate }), `rate: ${rate}`);
   }
   for (const startDate of ['2026-02-30', '2026-10-21']) {
@@ -83,16 +83,16 @@ test('rate changes use the rate effective in each interval, in any input order',
 
 test('rate changes at the first and final day are included correctly', () => {
   const result = api.calculatePenaltyWithRateChange(1000, '2026-01-01', '2026-01-10', [
-    { rate: 0.1, dateFrom: '2026-01-01' }, { rate: 0, dateFrom: '2026-01-10' },
+    { rate: 0.1, dateFrom: '2026-01-01' }, { rate: 0.2, dateFrom: '2026-01-10' },
   ]);
-  assert.equal(result.penalty, 9);
+  assert.equal(result.penalty, 11);
   assert.deepEqual(result.breakdown.map(row => row.days), [9, 1]);
 });
 
 test('rate history requires coverage and unambiguous dates', () => {
   for (const rates of [[], null, [{ rate: 1, dateFrom: '2027-01-01' }],
     [{ rate: 1, dateFrom: '2026-01-01' }, { rate: 2, dateFrom: '2026-01-01' }],
-    [{ rate: NaN, dateFrom: '2025-01-01' }]]) {
+    [{ rate: NaN, dateFrom: '2025-01-01' }], [{ rate: 0, dateFrom: '2025-01-01' }]]) {
     assert.throws(() => api.calculatePenaltyWithRateChange(1000, '2026-01-01', '2026-01-10', rates));
   }
 });
@@ -290,5 +290,5 @@ test('multi-year Article 366 calculations require an explicit day-count conventi
 
 test('penalties have no assumed statutory daily rate', () => {
   assert.throws(() => api.calculatePenalty({ debt: 1000, startDate: period.startDate, endDate: period.endDate }));
-  assert.equal(api.calculatePenalty({ ...period, rate: 0 }).penalty, 0);
+  assert.throws(() => api.calculatePenalty({ ...period, rate: 0 }));
 });

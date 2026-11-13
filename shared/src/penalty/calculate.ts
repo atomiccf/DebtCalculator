@@ -1,5 +1,5 @@
 import { DateInput, parsePeriod, parseDate, getDaysInYearForDate } from '../utils/dateUtils';
-import { assertRecord, assertNonNegativeNumber } from '../utils/validation';
+import { assertRecord, assertNonNegativeNumber, assertPositiveNumber } from '../utils/validation';
 import { sumMoney } from '../utils/money';
 import { getRefinancingRate } from '../api/refinancingRate';
 import { calculateAnnualAccrual, calculateDailyAccrual, AnnualDayCount } from './accrual';
@@ -18,7 +18,7 @@ export function calculatePenaltyWithRateChange(debt: number, startDate: DateInpu
   if (!Array.isArray(rates) || !rates.length) throw new Error('Необходима история ставок');
   const sorted = rates.map(r => {
     assertRecord(r);
-    assertNonNegativeNumber(r.rate, 'Ставка');
+    assertPositiveNumber(r.rate, 'Дневная пеня');
     return { rate: r.rate, dateFrom: parseDate(r.dateFrom).toString() };
   }).sort((a, b) => a.dateFrom.localeCompare(b.dateFrom));
   if (new Set(sorted.map(r => r.dateFrom)).size !== sorted.length) throw new Error('Дубли дат ставок');

@@ -10,13 +10,20 @@ import { parseNumericInput } from '../utils/numericInput'
 
 export default function PenaltyCalculator() {
   const [rate, setRate] = useState('')
+  const [rateError, setRateError] = useState('')
   const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
   const inputKey = JSON.stringify({ documents, rate })
   const { data, error, loading, stale, execute } = useApi<PenaltyMultipleResponse, PenaltyMultipleRequest>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE, 'POST', { schema: penaltyMultipleRequestSchema, inputKey })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await execute({ documents: documents.map(doc => ({ ...doc, debt: parseNumericInput(doc.debt, true) })), rate: parseNumericInput(rate) })
+    const parsedRate = parseNumericInput(rate)
+    if (!Number.isFinite(parsedRate) || parsedRate <= 0) {
+      setRateError('введите корректный размер пени')
+      return
+    }
+    setRateError('')
+    await execute({ documents: documents.map(doc => ({ ...doc, debt: parseNumericInput(doc.debt, true) })), rate: parsedRate })
   }
 
   const results = data?.results as unknown as Record<string, unknown>[] ?? []
@@ -64,10 +71,10 @@ export default function PenaltyCalculator() {
           ))}
         </div>
 
-        <FormField label="Ставка, % в день">
+        <FormField label="Размер пени, % в день">
           <NumericInput
             value={rate} 
-            onChange={setRate}
+            onChange={value => { setRate(value); setRateError('') }}
             required
           />
         </FormField>
@@ -84,12 +91,12 @@ export default function PenaltyCalculator() {
 
       {results.length > 0 && (
         <div className={styles.resultsSummary}>
-          Ставка: {resultRate}% в день
+          Размер пени: {resultRate}% в день
           {data && <CalculationDetails calculation={data} />}
         </div>
       )}
 
-      {error && <div className={styles.error}>{error}</div>}
+      {(rateError || error) && <div className={styles.error}>{rateError || error}</div>}
     </div>
   )
 }

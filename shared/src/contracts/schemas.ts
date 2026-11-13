@@ -101,7 +101,7 @@ export const calendarDateSchema: RequestSchema<string> = { parse(value) {
 } };
 const penaltyKeys = ['rate'];
 function penaltyCheck(c: Check, v: Record<string, unknown>) {
-  c.rate(v.rate, 'rate');
+  if (typeof v.rate !== 'number' || !Number.isFinite(v.rate) || v.rate <= 0) c.add('rate', 'введите корректный размер пени');
 }
 export const penaltyRequestSchema: RequestSchema<PenaltyRequest> = { parse(value) {
   const c = new Check(); const v = c.object(value, 'request');

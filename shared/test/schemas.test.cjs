@@ -40,8 +40,8 @@ test('daily penalty requires an explicit numeric rate and rejects annual calcula
     [api.penaltyRequestSchema, period],
     [api.penaltyMultipleRequestSchema, { documents: [{ name: 'Договор', ...period }] }],
   ]) {
-    for (const rate of [undefined, null, '', '0', -1]) rejects(schema, { ...request, rate }, 'rate');
-    assert.doesNotThrow(() => schema.parse({ ...request, rate: 0 }));
+    for (const rate of [undefined, null, '', '0', 0, -1]) rejects(schema, { ...request, rate }, 'rate');
+    assert.doesNotThrow(() => schema.parse({ ...request, rate: 0.0001 }));
     // Each forbidden field is independent; the value of rate does not change that rule.
     rejects(schema, { ...request, rate: 0.1, annualRate: 10 }, 'annualRate');
     rejects(schema, { ...request, rate: 0.1, dayCount: 365 }, 'dayCount');

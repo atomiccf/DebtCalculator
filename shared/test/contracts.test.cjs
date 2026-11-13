@@ -47,13 +47,13 @@ test('duty: scenario fields reach original-claim and administrative tariffs', as
     assert.deepEqual(body.input, JSON.parse(JSON.stringify(request)));
   }
 });
-test('both daily penalty endpoints preserve an explicitly entered zero rate', async () => {
+test('both daily penalty endpoints reject zero with a clear validation message', async () => {
   for (const endpoint of ['/api/penalty/calculate', '/api/penalty/calculate-multiple']) {
     const request = endpoint.endsWith('multiple') ? { documents: [{ ...period, name: 'Contract' }], rate: 0 } : { ...period, rate: 0 };
     const { status, body } = await post(endpoint, request);
-    assert.equal(status, 200);
-    assert.equal(body.total ?? body.amount, 0);
-    assert.equal(body.rate, 0);
+    assert.equal(status, 400);
+    assert.deepEqual(body.issues, [{ path: 'rate', message: 'введите корректный размер пени' }]);
+    assert.equal(body.results, undefined);
   }
 });
 

@@ -1,7 +1,8 @@
 import { getBaseValue } from '../api/baseValue';
 import { DateInput, today } from '../utils/dateUtils';
-import { assertDutyRulesDate } from './rules2026';
-import { calculateDutyWithBaseValue, ECONOMIC_CASES } from './dutyRules';
+import { getDutyRulesInfo } from './dutyEditions';
+import { calculateDutyWithBaseValue, calculateDutyWithRules } from './dutyRules';
+import { ECONOMIC_CASES } from './dutyRequirements';
 import type { EconomicCourtLevel, PlaintiffType } from './dutyTypes';
 
 export type EconomicCaseType = typeof ECONOMIC_CASES[number];
@@ -16,8 +17,8 @@ export function calculateEconomicCourtDutyWithBaseValue(config: EconomicRatesCon
   return calculateDutyWithBaseValue(config, baseValue, amount);
 }
 export function calculateEconomicCourtDuty(config: EconomicRatesConfig, amount?: number, date: DateInput = today()): number {
-  assertDutyRulesDate(date);
-  return calculateEconomicCourtDutyWithBaseValue(config, getBaseValue(date), amount);
+  const rules = getDutyRulesInfo(date);
+  return calculateDutyWithRules(config, getBaseValue(date), rules, amount);
 }
 
 export function getEconomicCaseTypesList(): { id: EconomicCaseType; name: string }[] {

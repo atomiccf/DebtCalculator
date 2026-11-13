@@ -1,5 +1,5 @@
 import { calculateDutyWithRules } from '../calculate/dutyRules';
-import { getDutyRulesInfo } from '../calculate/rules2026';
+import { getDutyRulesInfo } from '../calculate/dutyEditions';
 import { getBaseValueInfo } from '../api/baseValue';
 import type { DutyRequest, DutyResponse } from '../contracts/types';
 import { referenceWarning } from './referenceWarning';

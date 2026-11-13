@@ -3,7 +3,7 @@ import { penaltyMultipleRequestSchema, type PenaltyMultipleRequest, type Penalty
 import styles from '../components/Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { useDocuments } from '../hooks/useDocuments'
-import { DocumentForm, ResultsTable, FormField, NumericInput, ResultStatus } from '../components/ui'
+import { DocumentForm, ResultsTable, FormField, NumericInput, ResultStatus, type ResultsTableColumn } from '../components/ui'
 import { API_ENDPOINTS } from '../config/api'
 import { CalculationDetails } from './ui/CalculationDetails'
 import { parseNumericInput } from '../utils/numericInput'
@@ -26,19 +26,16 @@ export default function PenaltyCalculator() {
     await execute({ documents: documents.map(doc => ({ ...doc, debt: parseNumericInput(doc.debt, true) })), rate: parsedRate })
   }
 
-  const results = data?.results as unknown as Record<string, unknown>[] ?? []
+  const results = data?.results ?? []
   const total = data?.total ?? 0
   const resultRate = data?.rate ?? 0
 
-  const columns = [
+  const columns: ResultsTableColumn<PenaltyDocumentResponse>[] = [
     { key: 'name', header: 'Документ' },
-    { key: 'debt', header: 'Сумма', render: (v: unknown) => `${v} BYN` },
-    { key: 'startDate', header: 'Период', render: (_: unknown, row: unknown) => {
-      const r = row as PenaltyDocumentResponse
-      return `${r.startDate} — ${r.endDate}`
-    }},
+    { key: 'debt', header: 'Сумма', render: v => `${v} BYN` },
+    { key: 'startDate', header: 'Период', render: (startDate, row) => `${startDate} — ${row.endDate}` },
     { key: 'days', header: 'Дней' },
-    { key: 'penalty', header: 'Пени', render: (v: unknown) => `${v} BYN` },
+    { key: 'penalty', header: 'Пени', render: v => `${v} BYN` },
   ]
 
   const totalRow = [

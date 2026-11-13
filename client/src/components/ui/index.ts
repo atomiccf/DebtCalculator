@@ -1,5 +1,5 @@
 export { DocumentForm } from './DocumentForm'
-export { ResultsTable } from './ResultsTable'
+export { ResultsTable, type ResultsTableColumn } from './ResultsTable'
 export { FormField } from './FormField'
 export { NumericInput } from './NumericInput'
 export { ResultStatus } from './ResultStatus'

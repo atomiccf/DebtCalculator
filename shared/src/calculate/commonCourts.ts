@@ -1,7 +1,8 @@
 import { getBaseValue } from '../api/baseValue';
 import { DateInput, today } from '../utils/dateUtils';
-import { assertDutyRulesDate } from './rules2026';
-import { calculateDutyWithBaseValue, COMMON_CASES } from './dutyRules';
+import { getDutyRulesInfo } from './dutyEditions';
+import { calculateDutyWithBaseValue, calculateDutyWithRules } from './dutyRules';
+import { COMMON_CASES } from './dutyRequirements';
 import type { AdministrativePenalty } from './dutyTypes';
 
 export type CaseType = typeof COMMON_CASES[number];
@@ -17,8 +18,8 @@ export function calculateCommonCourtDutyWithBaseValue(config: CourtRatesConfig, 
   return calculateDutyWithBaseValue(config, baseValue, amount);
 }
 export function calculateCommonCourtDuty(config: CourtRatesConfig, amount?: number, date: DateInput = today()): number {
-  assertDutyRulesDate(date);
-  return calculateCommonCourtDutyWithBaseValue(config, getBaseValue(date), amount);
+  const rules = getDutyRulesInfo(date);
+  return calculateDutyWithRules(config, getBaseValue(date), rules, amount);
 }
 
 export function getCaseTypesList(): { id: CaseType; name: string }[] {

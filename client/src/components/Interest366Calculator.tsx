@@ -1,8 +1,8 @@
-import { interest366MultipleRequestSchema, splitPeriodByYear, type Interest366MultipleRequest, type Interest366MultipleResponse, type Interest366Response } from 'jurist-calculator-shared'
+import { interest366MultipleRequestSchema, splitPeriodByYear, type Interest366MultipleRequest, type Interest366MultipleResponse } from 'jurist-calculator-shared'
 import styles from './Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { useDocuments } from '../hooks/useDocuments'
-import { DocumentForm, ResultsTable, ResultStatus } from './ui'
+import { DocumentForm, ResultsTable, ResultStatus, type ResultsTableColumn } from './ui'
 import { CalculationDetails } from './ui/CalculationDetails'
 import { API_ENDPOINTS } from '../config/api'
 import { parseNumericInput } from '../utils/numericInput'
@@ -19,23 +19,19 @@ export default function Interest366Calculator() {
     }
     await execute(request)
   }
-  const results = data?.results as unknown as Record<string, unknown>[] ?? []
-  const columns = [
+  const results = data?.results ?? []
+  const columns: ResultsTableColumn<Interest366MultipleResponse['results'][number]>[] = [
     { key: 'name', header: 'Документ' },
-    { key: 'debt', header: 'Сумма', render: (v: unknown) => `${v} BYN` },
-    { key: 'startDate', header: 'Период', render: (_: unknown, row: unknown) => {
-      const r = row as Interest366Response
-      return `${r.startDate} — ${r.endDate}`
-    } },
+    { key: 'debt', header: 'Сумма', render: v => `${v} BYN` },
+    { key: 'startDate', header: 'Период', render: (startDate, row) => `${startDate} — ${row.endDate}` },
     { key: 'days', header: 'Дней' },
-    { key: 'dayCount', header: 'Дней в году', render: (_: unknown, row: unknown) => {
-      const r = row as Interest366Response
-      return splitPeriodByYear(r.startDate, r.endDate)
+    { key: 'dayCount', header: 'Дней в году', render: (_, row) => {
+      return splitPeriodByYear(row.startDate, row.endDate)
         .map(period => `${period.startDate.slice(0, 4)} — ${period.yearDivisor}`).join('; ')
     } },
     { key: 'rateDate', header: 'Дата ставки' },
-    { key: 'refinancingRate', header: 'Ставка', render: (v: unknown) => `${v}%` },
-    { key: 'interest', header: 'Проценты', render: (v: unknown) => `${v} BYN` },
+    { key: 'refinancingRate', header: 'Ставка', render: v => `${v}%` },
+    { key: 'interest', header: 'Проценты', render: v => `${v} BYN` },
   ]
   return <div className={styles.calculator}>
     <h2>Проценты по ст.366 ГК РБ</h2>

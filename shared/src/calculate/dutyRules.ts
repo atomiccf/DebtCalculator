@@ -1,87 +1,32 @@
 import { CalculationError } from '../utils/calculationError';
 import { assertRecord } from '../utils/validation';
 import { assertPositiveMoney, toDutyUnits, fromDutyUnits } from '../utils/money';
-import { calculatePropertyDutyUnits, DUTY_RULES_2026, type DutyRules } from './rules2026';
-import type { CourtRatesConfig } from './commonCourts';
-import type { EconomicRatesConfig } from './economicCourts';
+import { DUTY_EDITION_2026, DUTY_RULES_2026 } from './rules2026';
+import { getDutyEditionByVersion } from './dutyEditions';
+import type { DutyEdition, DutyRatesConfig, DutyRules } from './dutyEdition';
+import { DUTY_COURTS, ECONOMIC_COURTS, validateDutyRequirements } from './dutyRequirements';
 
-export const COMMON_CASES = ['property', 'non_property', 'divorce', 'divorce_repeat', 'divorce_missing', 'paternity', 'alimony', 'appeal', 'cassation', 'supervision', 'court_order', 'administrative', 'challenge_act', 'fact_establishment', 'contract_dispute'] as const;
-export const ECONOMIC_CASES = ['property', 'property_quality', 'non_property_org', 'non_property_ip', 'non_property_person', 'subsidiary', 'appeal', 'cassation', 'supervision', 'court_order', 'bankruptcy', 'fact_establishment', 'challenge_act', 'other_complaint', 'contract_dispute'] as const;
-export const COMPLAINT_CASES: readonly string[] = ['appeal', 'cassation', 'supervision'];
+export { COMMON_CASES, ECONOMIC_CASES, COMPLAINT_CASES } from './dutyRequirements';
 
-export function dutyUnits(config: CourtRatesConfig | EconomicRatesConfig, baseValue: number, amount?: number): bigint {
+export function dutyUnits(config: DutyRatesConfig, baseValue: number, amount?: number, edition: DutyEdition = DUTY_EDITION_2026): bigint {
   assertRecord(config as unknown);
   assertPositiveMoney(baseValue, 'Базовая величина');
-  if (amount !== undefined) assertPositiveMoney(amount, 'Сумма требования');
   const economic = 'courtLevel' in config;
-  const cases: readonly string[] = economic ? ECONOMIC_CASES : COMMON_CASES;
-  if (!cases.includes(config.caseType)) throw new CalculationError('Неизвестный тип дела');
-  if (!['individual', 'organization', ...(economic ? ['ip'] : [])].includes(config.plaintiffType)) throw new CalculationError('Недопустимый тип заявителя');
-  if (economic && !['economic', 'appellate_economic', 'supreme_economic'].includes(config.courtLevel)) throw new CalculationError('Недопустимый тип суда');
-  if (config.caseType === 'non_property_ip' && config.plaintiffType !== 'ip'
-    || config.caseType === 'non_property_org' && config.plaintiffType !== 'organization'
-    || config.caseType === 'non_property_person' && config.plaintiffType !== 'individual') throw new CalculationError('Тип требования не соответствует заявителю');
-  if ('isRepeated' in config && config.isRepeated !== undefined && typeof config.isRepeated !== 'boolean') throw new CalculationError('Повторность должна быть логическим значением');
+  const input = { ...config, courtType: economic ? config.courtLevel : 'common', amount };
+  const [issue] = validateDutyRequirements(input, economic ? ECONOMIC_COURTS : DUTY_COURTS);
+  if (issue) throw new CalculationError(issue.message);
   const bv = toDutyUnits(baseValue);
   const price = amount === undefined ? undefined : toDutyUnits(amount);
-  const property = () => {
-    if (price === undefined) throw new CalculationError('Для имущественного требования необходима сумма');
-    return calculatePropertyDutyUnits(price, bv, economic ? 'economic' : 'common');
-  };
-  if (COMPLAINT_CASES.includes(config.caseType)) {
-    if (price !== undefined) return property() * 8n / 10n;
-    if (!config.originalCaseType || COMPLAINT_CASES.includes(config.originalCaseType)) throw new CalculationError('Укажите исходный вид требования');
-    if (!economic && config.caseType === 'appeal' && config.plaintiffType === 'individual'
-      && ['alimony', 'divorce', 'divorce_repeat', 'divorce_missing'].includes(config.originalCaseType)) return 0n;
-    if (!economic && config.originalCaseType === 'alimony') throw new CalculationError('Льгота для этой стадии требует отдельной проверки');
-    if (economic) {
-      const dependent = ['non_property_org', 'non_property_ip', 'non_property_person', 'challenge_act', 'fact_establishment'];
-      if (dependent.includes(config.originalCaseType) && !config.originalCourtLevel) throw new CalculationError('Укажите суд исходного требования');
-      return dutyUnits({ ...config, caseType: config.originalCaseType, courtLevel: config.originalCourtLevel ?? config.courtLevel,
-        originalCaseType: undefined, originalCourtLevel: undefined }, baseValue) * 8n / 10n;
-    }
-    return dutyUnits({ ...config, caseType: config.originalCaseType, originalCaseType: undefined }, baseValue) * 8n / 10n;
-  }
-  switch (config.caseType) {
-    case 'property': return property();
-    case 'property_quality': return property() * 8n / 10n;
-    case 'court_order':
-      if (price === undefined) throw new CalculationError('Для приказного производства необходима сумма');
-      // Lower bounds in pp. 3.2/3.3 of Appendix 13 and 5.2/5.3 of Appendix 15 are inclusive.
-      return (price < 100n * bv ? 2n : price < 300n * bv ? 5n : 7n) * bv;
-    case 'non_property': return 3n * bv;
-    case 'non_property_org': case 'non_property_ip': case 'non_property_person':
-      return (economic && config.courtLevel === 'supreme_economic' ? 50n : economic && config.courtLevel === 'appellate_economic' ? 40n : 20n) * bv;
-    case 'contract_dispute': return (config.plaintiffType === 'organization' ? 20n : config.plaintiffType === 'ip' ? 10n : 5n) * bv;
-    case 'divorce': return ('isRepeated' in config && config.isRepeated ? 8n : 4n) * bv;
-    case 'divorce_repeat': return 8n * bv;
-    case 'divorce_missing': return bv;
-    case 'paternity': return 3n * bv;
-    case 'alimony': return 0n;
-    case 'subsidiary': return 25n * bv;
-    case 'bankruptcy': return 10n * bv;
-    case 'other_complaint': return bv / 2n;
-    case 'challenge_act': return economic ? (config.courtLevel === 'supreme_economic' ? 50n : config.courtLevel === 'appellate_economic' ? 40n : 20n) * bv : bv;
-    case 'fact_establishment':
-      if (economic && config.courtLevel === 'supreme_economic') throw new CalculationError('Для этого требования тариф Верховного Суда не поддержан');
-      return (economic ? config.courtLevel === 'appellate_economic' ? 15n : 10n : 2n) * bv;
-    case 'administrative': {
-      if (!('administrativePenalty' in config) || !['fine', 'other'].includes(config.administrativePenalty ?? '')) throw new CalculationError('Укажите вид административного взыскания');
-      if (config.administrativePenalty === 'other') return bv;
-      assertPositiveMoney(config.fineAmount, 'Размер штрафа');
-      const fine = toDutyUnits(config.fineAmount);
-      return fine < 10n * bv ? bv / 2n : fine < 100n * bv ? 2n * bv : 3n * bv;
-    }
-    default: throw new CalculationError('Неизвестный тип дела');
-  }
+  return edition.calculateUnits(config, bv, price);
 }
 
-export function calculateDutyWithBaseValue(config: CourtRatesConfig | EconomicRatesConfig, baseValue: number, amount?: number): number {
+/** Compatibility entry point pinned to the reviewed 2026 tariffs, with an explicit BV. */
+export function calculateDutyWithBaseValue(config: DutyRatesConfig, baseValue: number, amount?: number): number {
   return calculateDutyWithRules(config, baseValue, DUTY_RULES_2026, amount);
 }
 
 /** Pure core: receives the selected value and edition; performs no reference lookup. */
-export function calculateDutyWithRules(config: CourtRatesConfig | EconomicRatesConfig, baseValue: number, rules: DutyRules, amount?: number): number {
-  if (rules.version !== DUTY_RULES_2026.version) throw new CalculationError('Неподдерживаемая версия тарифов');
-  return fromDutyUnits(dutyUnits(config, baseValue, amount));
+export function calculateDutyWithRules(config: DutyRatesConfig, baseValue: number, rules: DutyRules, amount?: number): number {
+  const edition = getDutyEditionByVersion(rules.version);
+  return fromDutyUnits(dutyUnits(config, baseValue, amount, edition));
 }

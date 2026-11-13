@@ -7,6 +7,9 @@ const { NbrbService } = require('../../server/src/services/nbrbService.ts');
 const { CalculationDetails } = require('../../client/src/components/ui/CalculationDetails.tsx');
 const { createElement } = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
+const editions = require('../src/calculate/dutyEditions.ts');
+const { dutyUnits } = require('../src/calculate/dutyRules.ts');
+const { DUTY_EDITION_2026 } = require('../src/calculate/rules2026.ts');
 const duty = { courtType: 'common', caseType: 'property', plaintiffType: 'individual', amount: 1000, date: '2026-11-13' };
 const interest = { debt: 36500, startDate: '2026-05-01', endDate: '2026-05-31',
   calculationBasis: 'payment', rateDate: '2026-06-01', dayCount: 365, hasPenalty: false };
@@ -104,6 +107,76 @@ test('published tariff coverage accepts its boundaries and rejects adjacent unsu
   }
   assert.throws(() => api.calculateDutyService({ ...duty, date: '2026-06-30' }), api.CalculationError);
   assert.throws(() => api.calculateCommonCourtDuty(duty, 1000, '2027-01-01'), api.CalculationError);
+});
+
+// Synthetic edition tests dispatch only; this does not add unreviewed tariffs to production.
+function editionFixtures(calculateUnits) {
+  return [
+    { ...DUTY_EDITION_2026, rules: { ...DUTY_EDITION_2026.rules, dateTo: '2026-11-13' } },
+    { rules: { ...DUTY_EDITION_2026.rules, version: 'test-only-next-edition',
+      source: 'test-fixture', dateFrom: '2026-11-14' }, calculateUnits },
+  ];
+}
+
+test('edition selection binds dates and saved versions to the full implementation', () => {
+  let received;
+  const history = editionFixtures((config, baseValue, amount) => {
+    received = { config, baseValue, amount };
+    return 1005000n; // 1.005 BYN, rounded only by the common boundary.
+  });
+  const config = { caseType: 'property', plaintiffType: 'individual' };
+  for (const [date, version, expected] of [
+    ['2026-11-13', api.DUTY_RULES_2026.version, 135],
+    ['2026-11-14', 'test-only-next-edition', 1.01],
+    ['2026-12-31', 'test-only-next-edition', 1.01],
+  ]) {
+    const edition = api.getDutyEdition(date, history);
+    assert.equal(edition.rules.version, version);
+    assert.equal(editions.getDutyEditionByVersion(version, history), edition);
+    assert.equal(api.fromDutyUnits(dutyUnits(config, 45, 1000.50, edition)), expected);
+  }
+  assert.deepEqual(received, { config, baseValue: 45000000n, amount: 1000500000n });
+  // Selecting a new implementation does not mutate the older edition or its output.
+  assert.equal(api.calculateDutyWithRules(config, 45, JSON.parse(JSON.stringify(api.DUTY_RULES_2026)), 1000.50), 135);
+  assert.equal(api.DUTY_RULES_2026.dateTo, '2026-12-31');
+  for (const date of ['2026-06-30', '2027-01-01']) assert.throws(() => api.getDutyEdition(date, history), api.CalculationError);
+  const gap = [history[0], { ...history[1], rules: { ...history[1].rules, dateFrom: '2026-11-15' } }];
+  assert.throws(() => api.getDutyEdition('2026-11-14', gap), api.CalculationError);
+  assert.throws(() => api.getDutyEdition('2026-02-30', history));
+  assert.throws(() => api.calculateDutyWithRules(config, 45, { ...api.DUTY_RULES_2026, version: 'unknown' }, 1000.50), api.CalculationError);
+});
+
+test('dated wrappers and services execute the selected edition and retain serializable metadata', t => {
+  const history = editionFixtures(() => 1005000n);
+  const byVersion = editions.getDutyEditionByVersion;
+  t.mock.method(editions, 'getDutyRulesInfo', date => api.getDutyEdition(date, history).rules);
+  t.mock.method(editions, 'getDutyEditionByVersion', version => byVersion(version, history));
+  const scenarios = [
+    [duty, 135],
+    [{ ...duty, caseType: 'non_property', amount: undefined }, 135],
+    [{ ...duty, caseType: 'appeal' }, 108],
+    [{ ...duty, caseType: 'cassation', amount: undefined, originalCaseType: 'non_property' }, 108],
+    [{ ...duty, courtType: 'economic', plaintiffType: 'organization' }, 1125],
+    [{ ...duty, courtType: 'economic', plaintiffType: 'organization', caseType: 'non_property_org', amount: undefined }, 900],
+    [{ ...duty, courtType: 'supreme_economic', plaintiffType: 'organization', caseType: 'appeal',
+      amount: undefined, originalCaseType: 'non_property_org', originalCourtLevel: 'economic' }, 720],
+  ];
+  for (const [request, previous] of scenarios) {
+    for (const [date, expected] of [['2026-11-13', previous], ['2026-11-14', 1.01]]) {
+      const dated = { ...request, date };
+      const result = api.calculateDutyRequest(dated);
+      assert.equal(result.amount, expected);
+      assert.deepEqual(result.rules, api.getDutyEdition(date, history).rules);
+      assert.equal(result.rulesVersion, result.rules.version);
+      assert.deepEqual(JSON.parse(JSON.stringify(result)).rules, result.rules);
+      const { courtType, amount, date: filingDate, ...config } = dated;
+      const calculated = courtType === 'common' ? api.calculateCommonCourtDuty(config, amount, filingDate)
+        : api.calculateEconomicCourtDuty({ ...config, courtLevel: courtType }, amount, filingDate);
+      assert.equal(calculated, expected);
+    }
+  }
+  // Undated compatibility functions remain pinned to the original tariff edition.
+  assert.equal(api.calculateCommonCourtDutyWithBaseValue({ caseType: 'property', plaintiffType: 'individual' }, 45, 1000), 135);
 });
 
 test('reference history preserves effective intervals and stops at its published coverage limit', () => {

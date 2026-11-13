@@ -1,7 +1,7 @@
 import { parseDate, parsePeriod } from '../utils/dateUtils';
 import { assertPositiveMoney } from '../utils/money';
-import { COMMON_CASES, ECONOMIC_CASES, COMPLAINT_CASES } from '../calculate/dutyRules';
-import { getDutyRulesInfo } from '../calculate/rules2026';
+import { validateDutyRequirements } from '../calculate/dutyRequirements';
+import { getDutyRulesInfo } from '../calculate/dutyEditions';
 import type { DutyRequest, PenaltyRequest, PenaltyMultipleRequest, Interest366Request, Interest366MultipleRequest, ValidationIssue } from './types';
 
 export class ContractValidationError extends Error {
@@ -11,8 +11,6 @@ export class ContractValidationError extends Error {
   }
 }
 export interface RequestSchema<T> { parse(value: unknown): T }
-const courts = ['common', 'economic', 'appellate_economic', 'supreme_economic'];
-const economicCourts = courts.slice(1);
 const dayCounts = [360, 365, 366, 'start-year', 'end-year', 'actual/actual'];
 
 class Check {
@@ -70,28 +68,12 @@ export const dutyRequestSchema: RequestSchema<DutyRequest> = { parse(value) {
   const c = new Check(); const v = c.object(value, 'request');
   const common = v.courtType === 'common';
   c.keys(v, ['courtType', 'caseType', 'plaintiffType', 'amount', 'date', 'originalCaseType', ...(common ? ['isRepeated', 'administrativePenalty', 'fineAmount'] : ['originalCourtLevel'])]);
-  c.one(v.courtType, courts, 'courtType');
-  c.one(v.plaintiffType, common ? ['individual', 'organization'] : ['individual', 'organization', 'ip'], 'plaintiffType');
-  const cases: readonly string[] = common ? COMMON_CASES : ECONOMIC_CASES;
-  c.one(v.caseType, cases, 'caseType');
+  c.issues.push(...validateDutyRequirements({ ...v, courtType: v.courtType, caseType: v.caseType, plaintiffType: v.plaintiffType }));
   c.date(v.date, 'date');
   if (!c.issues.some(i => i.path === 'date')) {
     try { getDutyRulesInfo(v.date as string); }
     catch (error) { c.add('date', (error as Error).message); }
   }
-  if (v.amount !== undefined || ['property', 'property_quality', 'court_order'].includes(v.caseType as string)) c.money(v.amount, 'amount');
-  const expected = { non_property_org: 'organization', non_property_ip: 'ip', non_property_person: 'individual' }[v.caseType as string];
-  if (expected && v.plaintiffType !== expected) c.add('plaintiffType', 'Тип заявителя не соответствует требованию');
-  if (v.isRepeated !== undefined) c.bool(v.isRepeated, 'isRepeated');
-  if (v.originalCaseType !== undefined || COMPLAINT_CASES.includes(v.caseType as string) && v.amount === undefined) {
-    c.one(v.originalCaseType, cases.filter(ct => !COMPLAINT_CASES.includes(ct)), 'originalCaseType');
-    if (['property', 'property_quality', 'court_order'].includes(v.originalCaseType as string) && v.amount === undefined) c.money(v.amount, 'amount');
-  }
-  if (v.originalCourtLevel !== undefined || !common && COMPLAINT_CASES.includes(v.caseType as string) && v.amount === undefined
-    && ['non_property_org', 'non_property_ip', 'non_property_person', 'challenge_act', 'fact_establishment'].includes(v.originalCaseType as string)) c.one(v.originalCourtLevel, economicCourts, 'originalCourtLevel');
-  const administrative = common && (v.caseType === 'administrative' || v.originalCaseType === 'administrative');
-  if (administrative || v.administrativePenalty !== undefined) c.one(v.administrativePenalty, ['fine', 'other'], 'administrativePenalty');
-  if (v.fineAmount !== undefined || administrative && v.administrativePenalty === 'fine') c.money(v.fineAmount, 'fineAmount');
   return c.finish<DutyRequest>(v);
 } };
 

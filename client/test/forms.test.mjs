@@ -161,6 +161,60 @@ test('duty preserves administrative and repeated-divorce options in direct and o
   }
 })
 
+test('duty filters unsupported claims and resets an incompatible original court', async () => {
+  await mount(DutyCalculator)
+  await set('Дата обращения в суд', '2026-11-13')
+  assert.ok(!options('Тип заявителя').includes('ip'))
+  await set('Тип заявления', 'cassation')
+  await set('Характер жалобы', 'original')
+  assert.ok(!options('Исходное требование').includes('alimony'))
+  await set('Тип заявления', 'appeal')
+  assert.ok(options('Исходное требование').includes('alimony'))
+  await set('Тип заявителя', 'organization')
+  await set('Тип заявления', 'appeal')
+  assert.ok(!options('Исходное требование').includes('alimony'))
+
+  await set('Тип суда', 'supreme_economic')
+  const offered = options('Тип заявления')
+  assert.ok(offered.includes('non_property_org'))
+  for (const id of ['non_property_ip', 'non_property_person', 'fact_establishment']) assert.ok(!offered.includes(id), id)
+  await set('Тип заявления', 'appeal')
+  await set('Исходное требование', 'non_property_org')
+  assert.equal(field('Суд исходного требования').props.required, true)
+  await set('Суд исходного требования', 'supreme_economic')
+  assert.ok(options('Исходное требование').includes('fact_establishment'))
+  await set('Исходное требование', 'fact_establishment')
+  assert.deepEqual(options('Суд исходного требования'), ['economic', 'appellate_economic'])
+  assert.equal(field('Суд исходного требования').props.value, 'economic')
+  assert.equal((await submit()).response.amount, 360)
+  await set('Исходное требование', 'subsidiary')
+  assert.equal(field('Суд исходного требования').props.required, false)
+})
+
+test('duty submits only the additional facts for the selected complaint mode', async () => {
+  await mount(DutyCalculator)
+  await set('Дата обращения в суд', '2026-11-13')
+  await set('Тип заявления', 'cassation')
+  await set('Характер жалобы', 'original')
+  await set('Исходное требование', 'administrative')
+  await set('Размер штрафа (BYN)', '100')
+  assert.equal((await submit()).request.fineAmount, 100)
+  await set('Характер жалобы', 'property')
+  await set('Оспариваемая сумма (BYN)', '1000')
+  const { request } = await submit()
+  for (const key of ['originalCaseType', 'originalCourtLevel', 'administrativePenalty', 'fineAmount', 'isRepeated']) {
+    assert.equal(request[key], undefined, key)
+  }
+  await set('Характер жалобы', 'original')
+  await set('Исходное требование', 'divorce')
+  await change(renderer.root.findByProps({ type: 'checkbox' }), true)
+  const divorce = (await submit()).request
+  assert.equal(divorce.isRepeated, true)
+  assert.equal(divorce.amount, undefined)
+  assert.equal(divorce.administrativePenalty, undefined)
+  assert.equal(divorce.fineAmount, undefined)
+})
+
 test('money remains text and invalid amounts never reach the API', async () => {
   for (const Component of [DutyCalculator, PenaltyCalculator, Interest366Calculator]) {
     await mount(Component)

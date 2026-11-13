@@ -170,6 +170,7 @@ test('duty functions reject invalid money, enums, and incompatible plaintiffs', 
   }
   assert.throws(() => api.calculateCommonCourtDutyWithBaseValue({ ...common, plaintiffType: 'unknown' }, 45, 100));
   assert.throws(() => api.calculateEconomicCourtDutyWithBaseValue({ ...economic, courtLevel: 'unknown' }, 45, 100));
+  assert.throws(() => api.calculateEconomicCourtDutyWithBaseValue({ ...economic, courtLevel: 'common' }, 45, 100));
   assert.throws(() => api.calculateEconomicCourtDutyWithBaseValue({ ...economic, caseType: 'non_property_ip' }, 45));
   assert.throws(() => api.calculateCommonCourtDutyWithBaseValue(common, NaN, 100));
   assert.throws(() => api.calculateCommonCourtDutyWithBaseValue(common, 45));

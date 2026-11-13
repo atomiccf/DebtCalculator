@@ -4,7 +4,7 @@
   "description": "React frontend для калькулятора",
   "type": "module",
   "scripts": {
-    "test": "node --test test/forms.test.mjs",
+    "test": "node --test --test-concurrency=1 test/forms.test.mjs test/api.test.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"

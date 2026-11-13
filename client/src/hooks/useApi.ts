@@ -1,17 +1,20 @@
-import { useState, useCallback } from 'react'
-import { API_URL } from '../config/api'
-import type { RequestSchema } from 'jurist-calculator-shared'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import type { RequestSchema, ValidationIssue } from 'jurist-calculator-shared'
+import { apiRequest } from '../api/client'
+import { toApiError, type ApiError } from '../api/errors'
 
 interface UseApiOptions<T, B> {
   onSuccess?: (data: T) => void
-  onError?: (error: string) => void
+  onError?: (error: string, details: ApiError) => void
   schema?: RequestSchema<B>
   inputKey?: string
+  timeoutMs?: number
 }
 
 interface UseApiState<T> {
   data: T | null
   error: string
+  issues: ValidationIssue[]
   loading: boolean
   resultKey?: string
 }
@@ -19,6 +22,7 @@ interface UseApiState<T> {
 type UseApiReturn<T, B> = UseApiState<T> & {
   stale: boolean
   execute: (body?: B) => Promise<T | null>
+  cancel: () => void
   reset: () => void
 }
 
@@ -26,51 +30,66 @@ export function useApi<T, B = unknown>(endpoint: string, method: 'GET' | 'POST' 
   const [state, setState] = useState<UseApiState<T>>({
     data: null,
     error: '',
+    issues: [],
     loading: false,
   })
+  const activeRequest = useRef<AbortController | null>(null)
+
+  const abortRequest = useCallback(() => {
+    const controller = activeRequest.current
+    activeRequest.current = null
+    controller?.abort()
+  }, [])
+
+  useEffect(() => abortRequest, [abortRequest])
+
+  const cancel = useCallback(() => {
+    abortRequest()
+    setState(prev => ({ ...prev, error: '', issues: [], loading: false }))
+  }, [abortRequest])
+
+  const reset = useCallback(() => {
+    abortRequest()
+    setState({ data: null, error: '', issues: [], loading: false })
+  }, [abortRequest])
 
   const schema = options?.schema
   const onSuccess = options?.onSuccess
   const onError = options?.onError
   const inputKey = options?.inputKey
+  const timeoutMs = options?.timeoutMs
   const execute = useCallback(async (body?: B) => {
-    setState(prev => ({ ...prev, error: '', loading: true }))
+    abortRequest()
+    const controller = new AbortController()
+    activeRequest.current = controller
+    setState(prev => ({ ...prev, error: '', issues: [], loading: true }))
 
+    let data: T
     try {
-      const validatedBody = schema ? schema.parse(body) : body
-      const response = await fetch(`${API_URL}${endpoint}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: validatedBody === undefined ? undefined : JSON.stringify(validatedBody),
+      data = await apiRequest<T, B>(endpoint, {
+        method, body, schema, signal: controller.signal, timeoutMs,
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка расчёта')
-      }
-
-      setState({ data, error: '', loading: false, resultKey: inputKey })
-      onSuccess?.(data as T)
-      return data as T
     } catch (err) {
-      const errorMessage = 
-        err instanceof TypeError && err.message.includes('fetch')
-          ? 'Ошибка соединения с API. Проверьте доступность сервера и настройку адреса API.'
-          : err instanceof Error 
-            ? err.message 
-            : 'Ошибка расчёта'
-      
-      setState({ data: null, error: errorMessage, loading: false })
-      onError?.(errorMessage)
+      if (activeRequest.current !== controller) return null
+      activeRequest.current = null
+      const error = toApiError(err)
+      setState({ data: null, error: error.message, issues: error.issues, loading: false })
+      onError?.(error.message, error)
       return null
     }
-  }, [endpoint, method, schema, onSuccess, onError, inputKey])
+
+    if (activeRequest.current !== controller) return null
+    activeRequest.current = null
+    setState({ data, error: '', issues: [], loading: false, resultKey: inputKey })
+    onSuccess?.(data)
+    return data
+  }, [endpoint, method, schema, onSuccess, onError, inputKey, timeoutMs, abortRequest])
 
   return {
     ...state,
     stale: state.data !== null && state.resultKey !== inputKey,
     execute,
-    reset: () => setState({ data: null, error: '', loading: false }),
+    cancel,
+    reset,
   }
 }

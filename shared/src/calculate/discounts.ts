@@ -107,6 +107,7 @@ export function getDiscountById(id: string): Discount | undefined {
 
 export function getDiscountsForCourt(courtType: string, caseType: string): Discount[] {
   return discounts.filter(d => 
-    d.courtTypes.includes(courtType) || d.courtTypes.includes('all')
+    (d.courtTypes.includes(courtType) || d.courtTypes.includes('all')) &&
+    (d.caseTypes.includes(caseType) || d.caseTypes.includes('all'))
   );
 }

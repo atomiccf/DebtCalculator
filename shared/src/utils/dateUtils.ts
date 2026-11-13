@@ -1,67 +1,42 @@
 import { Temporal } from '@js-temporal/polyfill';
 
-export function isLeapYear(year: number): boolean {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-}
-
-export function getDaysInYear(year: number): number {
-  return isLeapYear(year) ? 366 : 365;
-}
-
-export function getDaysInYearForDate(date: Temporal.PlainDate | Date | string): number {
-  const plainDate = parseDate(date);
-  return getDaysInYear(plainDate.year);
-}
-
-export function calculateDaysInPeriod(
-  startDate: Temporal.PlainDate | Date | string,
-  endDate: Temporal.PlainDate | Date | string
-): number {
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-  return start.until(end).days + 1;
-}
-
-export function calculateExactYearDivisor(
-  startDate: Temporal.PlainDate | Date | string,
-  endDate: Temporal.PlainDate | Date | string
-): number {
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-  
-  if (start.year === end.year) {
-    return getDaysInYear(start.year);
-  }
-  
-  // Для периодов, затрагивающих несколько лет, используем средневзвешенное
-  const totalDays = calculateDaysInPeriod(start, end);
-  let weightedSum = 0;
-  
-  let current = start;
-  while (current.year <= end.year) {
-    const yearEnd = Temporal.PlainDate.from({ year: current.year, month: 12, day: 31 });
-    const periodEnd = Temporal.PlainDate.compare(current, end) <= 0 ? current : end;
-    const daysInThisYear = calculateDaysInPeriod(current, periodEnd);
-    
-    weightedSum += daysInThisYear * getDaysInYear(current.year);
-    
-    if (current.year >= end.year) break;
-    current = Temporal.PlainDate.from({ year: current.year + 1, month: 1, day: 1 });
-  }
-  
-  return weightedSum / totalDays;
-}
-
-function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
+export type DateInput = Temporal.PlainDate | Date | string;
+export function parseDate(date: DateInput): Temporal.PlainDate {
   if (date instanceof Date) {
-    return Temporal.PlainDate.from({
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate()
-    });
+    if (!Number.isFinite(date.getTime())) throw new Error('Некорректная дата');
+    return Temporal.PlainDate.from({ year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() });
   }
-  if (typeof date === 'string') {
-    return Temporal.PlainDate.from(date);
+  if (date instanceof Temporal.PlainDate) {
+    if (date.calendarId !== 'iso8601') throw new Error('Требуется календарь ISO');
+    return date;
   }
-  return date;
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Дата должна иметь формат YYYY-MM-DD');
+  return Temporal.PlainDate.from(date, { overflow: 'reject' });
+}
+export function today(): string { return Temporal.Now.plainDateISO('Europe/Minsk').toString(); }
+export function isLeapYear(year: number): boolean { return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0; }
+export function getDaysInYear(year: number): number { return isLeapYear(year) ? 366 : 365; }
+export function getDaysInYearForDate(date: DateInput): number { return getDaysInYear(parseDate(date).year); }
+export function parsePeriod(startDate: DateInput, endDate: DateInput) {
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  if (Temporal.PlainDate.compare(start, end) > 0) throw new Error('Дата окончания не может быть раньше даты начала');
+  return { start, end, days: start.until(end).days + 1 };
+}
+export function calculateDaysInPeriod(start: DateInput, end: DateInput): number { return parsePeriod(start, end).days; }
+export function splitPeriodByYear(startDate: DateInput, endDate: DateInput) {
+  const { start, end } = parsePeriod(startDate, endDate);
+  const periods = [];
+  let current = start;
+  while (Temporal.PlainDate.compare(current, end) <= 0) {
+    const yearEnd = Temporal.PlainDate.from({ year: current.year, month: 12, day: 31 });
+    const last = Temporal.PlainDate.compare(yearEnd, end) < 0 ? yearEnd : end;
+    periods.push({ startDate: current.toString(), endDate: last.toString(), days: current.until(last).days + 1, yearDivisor: getDaysInYear(current.year) });
+    current = last.add({ days: 1 });
+  }
+  return periods;
+}
+export function calculateExactYearDivisor(start: DateInput, end: DateInput): number {
+  const periods = splitPeriodByYear(start, end);
+  return periods.reduce((sum, p) => sum + p.days, 0) / periods.reduce((sum, p) => sum + p.days / p.yearDivisor, 0);
 }

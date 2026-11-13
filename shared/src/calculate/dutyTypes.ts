@@ -1,13 +1,16 @@
-export type CourtType = 'common' | 'economic' | 'supreme' | 'supreme_economic' | 'ip';
+import type { CaseType, CourtRatesConfig } from './commonCourts';
+import type { EconomicCaseType, EconomicRatesConfig } from './economicCourts';
 
-export interface DutyCalculationInput {
-  courtType: CourtType;
-  caseType: string;
-  plaintiffType: 'individual' | 'organization' | 'ip';
-  amount?: number;
-  date?: Date | string;
-  discountId?: string;
-}
+export type EconomicCourtLevel = 'economic' | 'appellate_economic' | 'supreme_economic';
+export type CourtType = 'common' | EconomicCourtLevel;
+export type PlaintiffType = 'individual' | 'organization' | 'ip';
+export type AdministrativePenalty = 'fine' | 'other';
+export type OriginalCaseType = Exclude<CaseType | EconomicCaseType, 'appeal' | 'cassation' | 'supervision'>;
+
+export type DutyCalculationInput = { amount?: number; date: string } & (
+  | ({ courtType: 'common' } & CourtRatesConfig)
+  | ({ courtType: EconomicCourtLevel } & Omit<EconomicRatesConfig, 'courtLevel'>)
+);
 
 export interface DutyCalculationResult {
   amount: number;

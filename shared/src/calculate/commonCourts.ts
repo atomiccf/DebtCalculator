@@ -1,102 +1,29 @@
 import { getBaseValue } from '../api/baseValue';
+import { DateInput, today } from '../utils/dateUtils';
+import { assertDutyRulesDate } from './rules2026';
+import { calculateDutyWithBaseValue, COMMON_CASES } from './dutyRules';
+import type { AdministrativePenalty } from './dutyTypes';
 
-function calcPropertyDuty(amount: number, date: Date | string): number {
-  const baseValue = getBaseValue(date);
-  const minDuty = 2 * baseValue;
-  const calculated = amount * 0.05;
-  return Math.max(calculated, minDuty);
-}
-
-function calcCourtOrderDuty(amount: number, date: Date | string): number {
-  const baseValue = getBaseValue(date);
-  if (amount <= 100 * baseValue) {
-    return baseValue;
-  } else if (amount <= 300 * baseValue) {
-    return 3 * baseValue;
-  }
-  return 5 * baseValue;
-}
-
-export type CaseType = 
-  | 'property'           // имущественный иск
-  | 'non_property'       // неимущественный иск
-  | 'divorce'            // расторжение брака
-  | 'divorce_repeat'     // повторный брак
-  | 'divorce_missing'    // расторжение брака с безвестно отсутствующим/недееспособным
-  | 'paternity'         // установление отцовства
-  | 'alimony'            // алименты
-  | 'appeal'            // апелляционная жалоба
-  | 'cassation'          // кассационная жалоба
-  | 'supervision'        // надзорная жалоба
-  | 'court_order'        // судебный приказ
-  | 'administrative'    // административное дело
-  | 'challenge_act'     // оспаривание акта
-  | 'fact_establishment'; // установление факта
-
+export type CaseType = typeof COMMON_CASES[number];
 export interface CourtRatesConfig {
   caseType: CaseType;
   isRepeated?: boolean;
   plaintiffType: 'individual' | 'organization';
+  originalCaseType?: Exclude<CaseType, 'appeal' | 'cassation' | 'supervision'>;
+  administrativePenalty?: AdministrativePenalty;
+  fineAmount?: number;
 }
-
-export function calculateCommonCourtDuty(config: CourtRatesConfig, amount?: number, date: Date | string = new Date()): number {
-  const baseValue = getBaseValue(date);
-  const { caseType, isRepeated, plaintiffType } = config;
-
-  switch (caseType) {
-    case 'property':
-      if (!amount || amount <= 0) {
-        throw new Error('Для имущественного иска необходимо указать сумму');
-      }
-      return calcPropertyDuty(amount, date);
-
-    case 'non_property':
-      return plaintiffType === 'organization' ? 20 * baseValue : 3 * baseValue;
-
-    case 'divorce':
-      return isRepeated ? 8 * baseValue : 4 * baseValue;
-
-    case 'divorce_repeat':
-      return 8 * baseValue;
-
-    case 'divorce_missing':
-      return baseValue;
-
-    case 'paternity':
-    case 'fact_establishment':
-      return plaintiffType === 'organization' ? 10 * baseValue : 3 * baseValue;
-
-    case 'alimony':
-      return baseValue;
-
-    case 'appeal':
-    case 'cassation':
-    case 'supervision':
-      if (amount && amount > 0) {
-        const baseDuty = calcPropertyDuty(amount, date);
-        return baseDuty * 0.8;
-      }
-      return 0.8 * (plaintiffType === 'organization' ? 20 * baseValue : 3 * baseValue);
-
-    case 'court_order':
-      if (!amount || amount <= 0) {
-        throw new Error('Для судебного приказа необходимо указать сумму взыскания');
-      }
-      return calcCourtOrderDuty(amount, date);
-
-    case 'administrative':
-      return 0.5 * baseValue;
-
-    case 'challenge_act':
-      return plaintiffType === 'organization' ? 20 * baseValue : 3 * baseValue;
-
-    default:
-      throw new Error('Неизвестный тип дела');
-  }
+export function calculateCommonCourtDutyWithBaseValue(config: CourtRatesConfig, baseValue: number, amount?: number): number {
+  return calculateDutyWithBaseValue(config, baseValue, amount);
+}
+export function calculateCommonCourtDuty(config: CourtRatesConfig, amount?: number, date: DateInput = today()): number {
+  assertDutyRulesDate(date);
+  return calculateCommonCourtDutyWithBaseValue(config, getBaseValue(date), amount);
 }
 
 export function getCaseTypesList(): { id: CaseType; name: string }[] {
   return [
+    { id: 'contract_dispute', name: 'Договорный спор' },
     { id: 'property', name: 'Исковое заявление имущественного характера' },
     { id: 'non_property', name: 'Исковое заявление неимущественного характера' },
     { id: 'divorce', name: 'Расторжение брака' },

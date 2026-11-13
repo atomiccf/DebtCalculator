@@ -1,36 +1,25 @@
 import { useState } from 'react'
+import { penaltyMultipleRequestSchema, type PenaltyMultipleRequest, type PenaltyMultipleResponse, type PenaltyDocumentResponse, type AnnualDayCount } from 'jurist-calculator-shared'
 import styles from '../components/Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { useDocuments } from '../hooks/useDocuments'
 import { DocumentForm, ResultsTable, FormField } from '../components/ui'
 import { API_ENDPOINTS } from '../config/api'
-
-interface DocumentResult {
-  name: string
-  debt: number
-  startDate: string
-  endDate: string
-  days: number
-  penalty: number
-}
-
-interface PenaltyResult {
-  results: DocumentResult[]
-  total: number
-  rate: number
-}
+import { CalculationDetails } from './ui/CalculationDetails'
+import { DayCountField } from './ui/DayCountField'
 
 export default function PenaltyCalculator() {
   const [rate, setRate] = useState('')
+  const [annual, setAnnual] = useState(false)
+  const [dayCount, setDayCount] = useState<AnnualDayCount | ''>('')
   const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
-  const { data, error, loading, execute } = useApi<PenaltyResult>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE)
+  const { data, error, loading, execute } = useApi<PenaltyMultipleResponse, PenaltyMultipleRequest>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE, 'POST', { schema: penaltyMultipleRequestSchema })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await execute({
-      documents,
-      rate: rate ? parseFloat(rate) : undefined
-    })
+    await execute(annual
+      ? { documents, annualRate: rate === '' ? NaN : Number(rate), dayCount: dayCount as AnnualDayCount }
+      : { documents, rate: rate === '' ? NaN : Number(rate) })
   }
 
   const results = data?.results as unknown as Record<string, unknown>[] ?? []
@@ -41,7 +30,7 @@ export default function PenaltyCalculator() {
     { key: 'name', header: 'Документ' },
     { key: 'debt', header: 'Сумма', render: (v: unknown) => `${v} BYN` },
     { key: 'startDate', header: 'Период', render: (_: unknown, row: unknown) => {
-      const r = row as DocumentResult
+      const r = row as PenaltyDocumentResponse
       return `${r.startDate} — ${r.endDate}`
     }},
     { key: 'days', header: 'Дней' },
@@ -78,12 +67,16 @@ export default function PenaltyCalculator() {
           ))}
         </div>
 
-        <FormField label="Ставка пени (% в день, по умолчанию 0.1%)">
+        <FormField label="Тип ставки"><select value={annual ? 'annual' : 'daily'} onChange={e => setAnnual(e.target.value === 'annual')}>
+          <option value="daily">Дневная</option><option value="annual">Годовая</option>
+        </select></FormField>
+        {annual && <DayCountField value={dayCount} onChange={setDayCount} required />}
+        <FormField label={annual ? 'Ставка (% в год)' : 'Ставка пени (% в день)'}>
           <input 
             type="number" 
             value={rate} 
             onChange={(e) => setRate(e.target.value)}
-            placeholder="0.1"
+            required
             min="0"
             step="0.01"
           />
@@ -100,7 +93,8 @@ export default function PenaltyCalculator() {
 
       {results.length > 0 && (
         <div className={styles.resultsSummary}>
-          Ставка: {resultRate}% в день
+          Ставка: {resultRate}% {data?.type === 'interest' ? 'в год' : 'в день'}
+          {data && <CalculationDetails calculation={data} />}
         </div>
       )}
 

@@ -1,10 +1,7 @@
 import { useState, useCallback } from 'react'
+import type { CalculationDocument } from 'jurist-calculator-shared'
 
-export interface Document {
-  name: string
-  debt: number
-  startDate: string
-  endDate: string
+export interface Document extends CalculationDocument {
   [key: string]: string | number
 }
 

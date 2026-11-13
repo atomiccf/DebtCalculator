@@ -1,4 +1,5 @@
-import { Temporal } from '@js-temporal/polyfill';
+import { DateInput, today } from '../utils/dateUtils';
+import { getEffectiveRecord } from '../referenceData/effectiveRecord';
 
 export interface RefinancingRate {
   value: number;
@@ -10,16 +11,22 @@ export interface RefinancingRateHistory {
   dateFrom: string;
   dateTo?: string;
   act: string;
+  source?: string;
+  verifiedOn?: string;
 }
 
-export const refinancingRateHistory: RefinancingRateHistory[] = [
-  { value: 9.75, dateFrom: '2025-06-25', act: 'Постановление Правления НБРБ от 23.06.2025 №163' },
-  { value: 9.5, dateFrom: '2024-10-18', act: 'Постановление Правления НБРБ от 17.10.2024 №283' },
-  { value: 10, dateFrom: '2024-07-19', act: 'Постановление Правления НБРБ от 18.07.2024 №198' },
-  { value: 11, dateFrom: '2024-04-17', act: 'Постановление Правления НБРБ от 16.04.2024 №108' },
-  { value: 12.5, dateFrom: '2024-01-23', act: 'Постановление Правления НБРБ от 22.01.2024 №25' },
-  { value: 14, dateFrom: '2023-12-12', act: 'Постановление Правления НБРБ от 11.12.2023 №371' },
-  { value: 11.5, dateFrom: '2023-01-23', act: 'Постановление Правления НБРБ от 18.01.2023 №19' },
+const verifiedRate = (value: number, dateFrom: string): RefinancingRateHistory => ({
+  value, dateFrom, act: 'Таблица ставок МНС', source: 'https://nalog.gov.by/reference/penalty_rate/', verifiedOn: '2026-11-12',
+});
+export const refinancingRateHistory: readonly Readonly<RefinancingRateHistory>[] = Object.freeze([
+  verifiedRate(9.25, '2026-06-01'),
+  verifiedRate(9.75, '2025-06-25'),
+  verifiedRate(9.5, '2023-06-28'),
+  verifiedRate(9.75, '2023-05-31'),
+  verifiedRate(10, '2023-05-02'),
+  verifiedRate(10.5, '2023-04-03'),
+  verifiedRate(11, '2023-03-01'),
+  verifiedRate(11.5, '2023-01-23'),
   { value: 12, dateFrom: '2022-03-01', act: 'Постановление Правления НБРБ от 28.02.2022 №95' },
   { value: 9.25, dateFrom: '2021-07-21', act: 'Постановление Правления НБРБ от 15.07.2021 №203' },
   { value: 8.5, dateFrom: '2021-04-21', act: 'Постановление Правления НБРБ от 14.04.2021 №94' },
@@ -139,48 +146,12 @@ export const refinancingRateHistory: RefinancingRateHistory[] = [
   { value: 175, dateFrom: '2000-02-21', act: 'Постановление Правления НБРБ от 16.02.2000 N 4.1г' },
   { value: 200, dateFrom: '2000-01-21', act: 'Постановление Правления НБРБ от 19.01.2000 N 2.1г' },
   { value: 250, dateFrom: '1999-12-21', act: 'Постановление Правления НБРБ от 15.12.1999' },
-];
+].map(record => Object.freeze(record)));
 
-function parseDate(date: Temporal.PlainDate | Date | string): Temporal.PlainDate {
-  if (date instanceof Date) {
-    return Temporal.PlainDate.from({
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate()
-    });
-  }
-  if (typeof date === 'string') {
-    return Temporal.PlainDate.from(date);
-  }
-  return date;
+export function getRefinancingRate(date: DateInput = today()): number {
+  return getRefinancingRateInfo(date).value;
 }
-
-export function getRefinancingRate(date?: Temporal.PlainDate | Date | string): number {
-  const checkDate = date ? parseDate(date) : Temporal.Now.plainDateISO();
-  
-  for (const record of refinancingRateHistory) {
-    const recordDate = Temporal.PlainDate.from(record.dateFrom);
-    if (checkDate.since(recordDate).days >= 0) {
-      return record.value;
-    }
-  }
-  
-  return refinancingRateHistory[refinancingRateHistory.length - 1].value;
+export function getRefinancingRateInfo(date: DateInput = today()): RefinancingRateHistory {
+  return getEffectiveRecord(refinancingRateHistory, date);
 }
-
-export function getRefinancingRateInfo(date?: Temporal.PlainDate | Date | string): RefinancingRateHistory {
-  const checkDate = date ? parseDate(date) : Temporal.Now.plainDateISO();
-  
-  for (const record of refinancingRateHistory) {
-    const recordDate = Temporal.PlainDate.from(record.dateFrom);
-    if (checkDate.since(recordDate).days >= 0) {
-      return record;
-    }
-  }
-  
-  return refinancingRateHistory[refinancingRateHistory.length - 1];
-}
-
-export function getCurrentRefinancingRate(): number {
-  return refinancingRateHistory[0].value;
-}
+export function getCurrentRefinancingRate(): number { return getRefinancingRate(); }

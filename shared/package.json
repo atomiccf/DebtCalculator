@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "test": "node --test test/shared.test.cjs test/contracts.test.cjs",
+    "test:contracts": "node --test test/contracts.test.cjs",
+    "typecheck": "tsc -p test/tsconfig.json --noEmit",
     "build": "tsc",
     "dev": "tsc --watch"
   },

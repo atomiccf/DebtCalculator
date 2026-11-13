@@ -15,6 +15,7 @@ export function DocumentForm({ document, index, onChange, onRemove, canRemove }:
         <div className={styles.formGroup}>
           <input 
             type="text" 
+            required
             value={document.name as string}
             onChange={(e) => onChange(index, 'name', e.target.value)}
             placeholder="Название (накладная №, договор и т.д.)"
@@ -23,17 +24,19 @@ export function DocumentForm({ document, index, onChange, onRemove, canRemove }:
         <div className={styles.formGroup}>
           <input 
             type="number" 
+            required
             value={document.debt as number || ''}
             onChange={(e) => onChange(index, 'debt', parseFloat(e.target.value) || 0)}
             placeholder="Сумма (BYN)"
-            min="0"
+            min="0.01"
             step="0.01"
           />
         </div>
         <div className={styles.formGroup}>
-          <label>с</label>
+          <label>Первый день просрочки</label>
           <input 
             type="date" 
+            required
             value={document.startDate as string}
             onChange={(e) => onChange(index, 'startDate', e.target.value)}
           />
@@ -42,6 +45,8 @@ export function DocumentForm({ document, index, onChange, onRemove, canRemove }:
           <label>по</label>
           <input 
             type="date" 
+            required
+            min={document.startDate as string}
             value={document.endDate as string}
             onChange={(e) => onChange(index, 'endDate', e.target.value)}
           />

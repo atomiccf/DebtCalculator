@@ -1,71 +1,118 @@
 # Jurist Calculator
 
-Проект состоит из npm workspaces: `shared` (расчёты), `server` (Express API)
-и `client` (React/Vite). Зависимости устанавливаются из корня; общий
-`package-lock.json` фиксирует версии для всех трёх пакетов.
+Calculators for Belarusian court duties, late-payment penalties, and interest under Article 366 of the Civil Code of Belarus.
 
-Общие схемы запросов, обязательные поля по сценариям, метаданные ответов
-и команды проверки описаны в [shared/CONTRACTS.md](shared/CONTRACTS.md).
-Поддерживаемые редакции, покрытие справочников и порядок обновления:
-[shared/REFERENCE_DATA.md](shared/REFERENCE_DATA.md).
+## Features
 
-Прикладные сервисы расчёта находятся в `shared/src/services`; правила подсчёта
-дней, округления и денежной арифметики остаются в общем ядре. HTTP-обработчики
-проверяют запрос, вызывают сервис и отправляют ответ. Пеня требует явно заданного
-размера пени больше `0%` в день; годовая ставка поддерживается отдельным калькулятором ст. 366.
-`server/src/app.ts` экспортирует `createApp()` и приложение без открытия порта;
-`server/src/index.ts` отвечает только за запуск сервера.
+- Court duty calculations for ordinary and economic courts, including supported appeals and exemptions.
+- Daily late-payment penalties across multiple documents. The penalty percentage must be explicitly entered and greater than zero.
+- Article 366 interest across multiple documents. The interface selects one refinancing rate on each document's final period date and applies it to the entire period. Calendar year lengths of 365 or 366 days are handled automatically and shown in the results.
+- Calculation details with rule versions, reference data sources, and warnings.
 
-## Установка и сборка
+For Article 366 calculations, the final period date represents the payment date, court decision date, or date of a notarial enforcement inscription. A calculation ending on an interim date before that event is an estimate.
+
+## Project structure
+
+The repository uses npm workspaces with a single root `package-lock.json`.
+
+| Workspace | Purpose |
+| --- | --- |
+| `shared` | Calculation logic, request validation, reference data, and application services |
+| `server` | Express API |
+| `client` | React application built with Vite |
+
+Application services live in `shared/src/services`. Calendar calculations, rounding, and monetary arithmetic belong to the shared calculation core. HTTP handlers validate requests, call services, and return responses using the same contracts as the client.
+
+`server/src/app.ts` exports `createApp()` and an application instance without opening a port. `server/src/index.ts` starts the API server.
+
+## Installation and build
+
+Run all commands from the repository root.
 
 ```sh
 npm ci
 npm run build
 ```
 
-Сборка выполняется последовательно: `shared` → `server` → `client`.
-Команда `npm run build:server` также сначала собирает библиотеку `shared`.
-Сервер импортирует локальный workspace `jurist-calculator-shared` через
-`shared/dist/index.js`; копировать или устанавливать библиотеку отдельно не нужно.
+The build runs in this order: `shared` → `server` → `client`. Running `npm run build:server` also builds `shared` first.
 
-Запуск собранного API:
+The server loads the local `jurist-calculator-shared` workspace through `shared/dist/index.js`. No separate installation or copying of the shared package is required.
+
+Start the compiled API:
 
 ```sh
 npm start -w server
 ```
 
-## Разработка
+The API listens on port `3000` by default. Set `PORT` to use a different port.
 
-В двух терминалах из корня:
+## Development
+
+Start the API and client in two separate terminals.
+
+API:
 
 ```sh
 npm run dev:server
 ```
 
+Client:
+
 ```sh
 npm run dev:client
 ```
 
-Перед каждым запуском dev-сервера библиотека `shared` компилируется заново.
-Изменения в `server/src` и `shared/src` автоматически перезапускают сервер;
-при ошибке компиляции новый процесс API не запускается со старой библиотекой.
+The client is available at [http://localhost:5173](http://localhost:5173). The API provides a health endpoint at [http://localhost:3000/health](http://localhost:3000/health).
 
-Клиент по умолчанию отправляет запросы на `/api` текущего домена. В режиме
-разработки Vite перенаправляет их на API. Для настройки скопируйте
-`client/.env.example` в `client/.env.local`: `VITE_API_URL` задаёт базовый URL
-отдельного API без завершающего `/api`, а `API_PROXY_TARGET` — адрес API для
-dev-прокси (по умолчанию `http://127.0.0.1:3000`). После изменения переменных
-перезапустите Vite; для опубликованного клиента переменные задаются при сборке.
+The API development process recompiles `shared` before starting. Changes in `server/src` or `shared/src` automatically restart the server. If shared compilation fails, the new API process does not start with an outdated library.
 
-Проверка клиентских сценариев без сборки: `npm test -w client`. Тесты заполняют
-React-формы, проверяют отправленные запросы общими схемами и выполняют расчёты
-прикладными сервисами; внешний API для них не требуется.
+## Client configuration
 
-## Проверка сборки
+By default, the client sends requests to `/api` on the current origin. During development, Vite proxies these requests to the API server.
+
+Copy `client/.env.example` to `client/.env.local` to customize the connection:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `VITE_API_URL` | Base URL of a separate API host, without the `/api` suffix | Empty; uses the current origin |
+| `API_PROXY_TARGET` | API address used by the Vite development proxy | `http://127.0.0.1:3000` |
+
+Restart Vite after changing these variables. For a deployed client, set `VITE_API_URL` when building the application.
+
+## Tests and type checking
+
+Run the test suites without building the project:
 
 ```sh
-npm run build
+npm test -w client
+npm test -w shared
 ```
 
-При изменении зависимостей выполняйте `npm install` из корня, например
-`npm install <package> -w server`, и сохраняйте общий lock-файл.
+Client tests fill React forms, validate outgoing requests with the shared schemas, and calculate results through application services. They do not require a running API server. Shared tests cover calculation logic, validation, reference data, and HTTP contracts; HTTP tests start a local test server.
+
+Run type checks:
+
+```sh
+npm run typecheck -w shared
+npx tsc --noEmit -p client/tsconfig.json
+```
+
+## Dependency management
+
+Install or update dependencies from the repository root, targeting the appropriate workspace:
+
+```sh
+npm install <package> -w server
+```
+
+Commit the updated root `package-lock.json` along with changes to package manifests.
+
+## Calculation documentation
+
+The detailed calculation documents are currently in Russian:
+
+- [Shared library](shared/README.md): calculation functions and architecture.
+- [API contracts](shared/CONTRACTS.md): request schemas, required fields, response metadata, and validation commands.
+- [Reference data and rule snapshots](shared/REFERENCE_DATA.md): supported editions, date coverage, and update procedures.
+- [Legal review](shared/LEGAL_REVIEW.md): reviewed provisions, sources, and calculation limitations.
+- [Test coverage](shared/test/README.md): test responsibilities and known coverage boundaries.

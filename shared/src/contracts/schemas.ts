@@ -1,7 +1,7 @@
 import { parseDate, parsePeriod } from '../utils/dateUtils';
 import { assertPositiveMoney } from '../utils/money';
 import { COMMON_CASES, ECONOMIC_CASES, COMPLAINT_CASES } from '../calculate/dutyRules';
-import { DUTY_RULES_2026 } from '../calculate/rules2026';
+import { getDutyRulesInfo } from '../calculate/rules2026';
 import type { DutyRequest, PenaltyRequest, PenaltyMultipleRequest, Interest366Request, Interest366MultipleRequest, ValidationIssue } from './types';
 
 export class ContractValidationError extends Error {
@@ -75,7 +75,10 @@ export const dutyRequestSchema: RequestSchema<DutyRequest> = { parse(value) {
   const cases: readonly string[] = common ? COMMON_CASES : ECONOMIC_CASES;
   c.one(v.caseType, cases, 'caseType');
   c.date(v.date, 'date');
-  if (typeof v.date === 'string' && /^\d{4}-/.test(v.date) && Number(v.date.slice(0, 4)) !== DUTY_RULES_2026.supportedYear) c.add('date', 'Поддержана редакция тарифов 2026 года');
+  if (!c.issues.some(i => i.path === 'date')) {
+    try { getDutyRulesInfo(v.date as string); }
+    catch (error) { c.add('date', (error as Error).message); }
+  }
   if (v.amount !== undefined || ['property', 'property_quality', 'court_order'].includes(v.caseType as string)) c.money(v.amount, 'amount');
   const expected = { non_property_org: 'organization', non_property_ip: 'ip', non_property_person: 'individual' }[v.caseType as string];
   if (expected && v.plaintiffType !== expected) c.add('plaintiffType', 'Тип заявителя не соответствует требованию');

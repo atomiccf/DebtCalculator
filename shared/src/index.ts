@@ -5,6 +5,7 @@ export * from './api/refinancingRate';
 export * from './utils/dateUtils';
 export * from './utils/money';
 export * from './referenceData/effectiveRecord';
+export * from './referenceData/rules';
 export * from './penalty/accrual';
 export * from './contracts';
 export * from './services';

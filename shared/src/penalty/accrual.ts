@@ -3,6 +3,11 @@ import { calculateMoneyAccrual } from '../utils/money';
 import { assertRecord } from '../utils/validation';
 
 export const CALCULATION_RULES_VERSION = '2.1.0';
+export const ACCRUAL_RULES = Object.freeze({
+  version: CALCULATION_RULES_VERSION,
+  source: 'Методика калькулятора: начисление за календарные дни',
+  provisions: 'Алгоритм начисления: включительные календарные дни, десятичная арифметика, округление half-up. Не устанавливает правовое основание ставки.',
+});
 export type AnnualDayCount = 'start-year' | 'end-year' | 'actual/actual' | 360 | 365 | 366;
 
 export interface AccrualInput {

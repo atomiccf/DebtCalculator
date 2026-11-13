@@ -54,6 +54,14 @@ export interface Interest366Result {
 }
 export function calculateInterest366(input: Interest366Input): Interest366Result {
   assertRecord(input);
+  const rateDate = input.rateDate === undefined ? parseDate(input.endDate).toString() : parseDate(input.rateDate).toString();
+  return calculateInterest366WithRate({ ...input,
+    refinancingRate: input.refinancingRate === undefined ? getRefinancingRate(rateDate) : input.refinancingRate });
+}
+
+/** Pure core: the application selects the reference record before calling this function. */
+export function calculateInterest366WithRate(input: Interest366Input & { refinancingRate: number }): Interest366Result {
+  assertRecord(input);
   const { start, end } = parsePeriod(input.startDate, input.endDate);
   const basis = input.calculationBasis ?? 'estimate';
   if (!['payment', 'judgment', 'executive-endorsement', 'estimate'].includes(basis)) throw new Error('Неизвестное основание расчёта');
@@ -64,8 +72,8 @@ export function calculateInterest366(input: Interest366Input): Interest366Result
   if (basis !== 'estimate' && (input.rateDate === undefined || input.dayCount === undefined)) throw new Error('Укажите дату выбора ставки и методику расчёта');
   if (start.year !== end.year && input.dayCount === undefined) throw new Error('Для периода в нескольких годах укажите методику расчёта');
   const rateDate = input.rateDate === undefined ? end.toString() : parseDate(input.rateDate).toString();
-  if (input.refinancingRate !== undefined) assertNonNegativeNumber(input.refinancingRate, 'Ставка рефинансирования');
-  const rate = input.refinancingRate ?? getRefinancingRate(rateDate);
+  assertNonNegativeNumber(input.refinancingRate, 'Ставка рефинансирования');
+  const rate = input.refinancingRate;
   const dayCount = input.dayCount ?? (getDaysInYearForDate(start) as 365 | 366);
   const result = calculateAnnualAccrual({ ...input, rate, dayCount });
   const warnings: string[] = [];

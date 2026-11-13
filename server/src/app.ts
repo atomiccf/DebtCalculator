@@ -5,7 +5,7 @@ import {
   calculateInterest366Service, calculateInterest366MultipleService,
   dutyRequestSchema, penaltyRequestSchema, penaltyMultipleRequestSchema,
   interest366RequestSchema, interest366MultipleRequestSchema,
-  getCaseTypesList, getEconomicCaseTypesList, getBaseValueInfo, getCurrentRefinancingRate,
+  getCaseTypesList, getEconomicCaseTypesList, getBaseValueInfo,
   calendarDateSchema, today,
   type CaseTypesResponse, type RequestSchema,
 } from 'jurist-calculator-shared';
@@ -43,24 +43,19 @@ export function createApp() {
     try { res.json(getBaseValueInfo(req.query.date === undefined ? today() : calendarDateSchema.parse(req.query.date))); }
     catch (error) { next(error); }
   });
-  app.get('/api/rates/current', asyncRoute(async (_req: Request, res: Response) => {
-    const baseValue = getBaseValueInfo();
-    try {
-      const refinancing = await nbrbService.fetchRefinancingRate();
-      res.json({ baseValue: baseValue.value, baseValueDate: baseValue.dateFrom, baseValueAct: baseValue.act,
-        refinancingRate: refinancing.rate, refinancingRateDate: refinancing.date, updatedAt: new Date().toISOString() });
-    } catch {
-      res.json({ baseValue: baseValue.value, baseValueDate: baseValue.dateFrom, baseValueAct: baseValue.act,
-        refinancingRate: getCurrentRefinancingRate(), refinancingRateDate: 'fallback', updatedAt: new Date().toISOString(), fallback: true });
-    }
+  app.get('/api/rates/current', asyncRoute(async (req: Request, res: Response) => {
+    const selectedOn = req.query.date === undefined ? today() : calendarDateSchema.parse(req.query.date);
+    const baseValue = getBaseValueInfo(selectedOn);
+    const refinancing = await nbrbService.getRefinancingRateForDate(selectedOn);
+    res.json({ baseValue: baseValue.value, baseValueDate: baseValue.dateFrom, baseValueAct: baseValue.act,
+      refinancingRate: refinancing.rate, refinancingRateDate: refinancing.date,
+      referenceData: { baseValue: { selectedOn, record: baseValue }, refinancingRate: refinancing },
+      fallback: refinancing.fallback, warnings: refinancing.warnings, updatedAt: new Date().toISOString() });
   }));
-  app.get('/api/rates/refinancing', asyncRoute(async (_req: Request, res: Response) => {
-    try {
-      const result = await nbrbService.fetchRefinancingRate();
-      res.json({ value: result.rate, date: result.date, type: 'annual' });
-    } catch {
-      res.json({ value: getCurrentRefinancingRate(), date: 'fallback', type: 'annual', fallback: true });
-    }
+  app.get('/api/rates/refinancing', asyncRoute(async (req: Request, res: Response) => {
+    const selectedOn = req.query.date === undefined ? today() : calendarDateSchema.parse(req.query.date);
+    const result = await nbrbService.getRefinancingRateForDate(selectedOn);
+    res.json({ ...result, value: result.rate, type: 'annual' });
   }));
   app.use(notFound);
   app.use(errorHandler);

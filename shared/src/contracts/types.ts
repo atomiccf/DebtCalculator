@@ -5,6 +5,7 @@ import type { BaseValueRecord } from '../api/baseValue';
 import type { RefinancingRateHistory } from '../api/refinancingRate';
 import type { CaseType } from '../calculate/commonCourts';
 import type { EconomicCaseType } from '../calculate/economicCourts';
+import type { RulesSnapshot } from '../referenceData/rules';
 
 /** Calendar dates at the transport boundary are ISO YYYY-MM-DD strings, never timestamps. */
 export type CalendarDate = string;
@@ -28,6 +29,7 @@ export type Interest366MultipleRequest = { documents: CalculationDocument[] } & 
 
 export interface CalculationMetadata {
   rulesVersion: string;
+  rules: RulesSnapshot;
   methodology: {
     kind: 'court-duty' | 'daily' | 'annual' | 'article-366';
     dayCount?: AnnualDayCount;
@@ -37,7 +39,10 @@ export interface CalculationMetadata {
   };
   referenceData: {
     baseValue?: { selectedOn: CalendarDate; record: BaseValueRecord };
-    refinancingRate?: { selectedOn: CalendarDate; origin: 'reference' | 'input'; value: number; record?: RefinancingRateHistory };
+    refinancingRate?: { selectedOn: CalendarDate; origin: 'reference' | 'input'; value: number;
+      dateFrom: CalendarDate | null; dateTo: CalendarDate | null; source: string; version: string;
+      record?: RefinancingRateHistory };
+    dailyRate?: { value: number; dateFrom: CalendarDate; dateTo: CalendarDate; source: 'user-input' };
   };
   warnings: string[];
 }

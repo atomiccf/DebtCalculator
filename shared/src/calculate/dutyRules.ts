@@ -1,7 +1,7 @@
 import { CalculationError } from '../utils/calculationError';
 import { assertRecord } from '../utils/validation';
 import { assertPositiveMoney, toDutyUnits, fromDutyUnits } from '../utils/money';
-import { calculatePropertyDutyUnits } from './rules2026';
+import { calculatePropertyDutyUnits, DUTY_RULES_2026, type DutyRules } from './rules2026';
 import type { CourtRatesConfig } from './commonCourts';
 import type { EconomicRatesConfig } from './economicCourts';
 
@@ -47,7 +47,7 @@ export function dutyUnits(config: CourtRatesConfig | EconomicRatesConfig, baseVa
     case 'property_quality': return property() * 8n / 10n;
     case 'court_order':
       if (price === undefined) throw new CalculationError('Для приказного производства необходима сумма');
-      if (price === 100n * bv || price === 300n * bv) throw new CalculationError('Точный порог приказного производства требует подтверждения тарифа');
+      // Lower bounds in pp. 3.2/3.3 of Appendix 13 and 5.2/5.3 of Appendix 15 are inclusive.
       return (price < 100n * bv ? 2n : price < 300n * bv ? 5n : 7n) * bv;
     case 'non_property': return 3n * bv;
     case 'non_property_org': case 'non_property_ip': case 'non_property_person':
@@ -77,5 +77,11 @@ export function dutyUnits(config: CourtRatesConfig | EconomicRatesConfig, baseVa
 }
 
 export function calculateDutyWithBaseValue(config: CourtRatesConfig | EconomicRatesConfig, baseValue: number, amount?: number): number {
+  return calculateDutyWithRules(config, baseValue, DUTY_RULES_2026, amount);
+}
+
+/** Pure core: receives the selected value and edition; performs no reference lookup. */
+export function calculateDutyWithRules(config: CourtRatesConfig | EconomicRatesConfig, baseValue: number, rules: DutyRules, amount?: number): number {
+  if (rules.version !== DUTY_RULES_2026.version) throw new CalculationError('Неподдерживаемая версия тарифов');
   return fromDutyUnits(dutyUnits(config, baseValue, amount));
 }

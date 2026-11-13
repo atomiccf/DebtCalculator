@@ -1,5 +1,5 @@
 import { DateInput, today } from '../utils/dateUtils';
-import { getEffectiveRecord } from '../referenceData/effectiveRecord';
+import { getEffectiveRecord, withEffectiveDates } from '../referenceData/effectiveRecord';
 
 export interface RefinancingRate {
   value: number;
@@ -13,12 +13,14 @@ export interface RefinancingRateHistory {
   act: string;
   source?: string;
   verifiedOn?: string;
+  supportedThrough?: string;
+  version?: string;
 }
 
 const verifiedRate = (value: number, dateFrom: string): RefinancingRateHistory => ({
-  value, dateFrom, act: 'Таблица ставок МНС', source: 'https://nalog.gov.by/reference/penalty_rate/', verifiedOn: '2026-11-12',
+  value, dateFrom, act: 'Таблица ставок МНС', source: 'https://nalog.gov.by/reference/penalty_rate/', verifiedOn: '2026-11-13',
 });
-export const refinancingRateHistory: readonly Readonly<RefinancingRateHistory>[] = Object.freeze([
+export const refinancingRateHistory: readonly Readonly<RefinancingRateHistory>[] = withEffectiveDates([
   verifiedRate(9.25, '2026-06-01'),
   verifiedRate(9.75, '2025-06-25'),
   verifiedRate(9.5, '2023-06-28'),
@@ -146,7 +148,10 @@ export const refinancingRateHistory: readonly Readonly<RefinancingRateHistory>[]
   { value: 175, dateFrom: '2000-02-21', act: 'Постановление Правления НБРБ от 16.02.2000 N 4.1г' },
   { value: 200, dateFrom: '2000-01-21', act: 'Постановление Правления НБРБ от 19.01.2000 N 2.1г' },
   { value: 250, dateFrom: '1999-12-21', act: 'Постановление Правления НБРБ от 15.12.1999' },
-].map(record => Object.freeze(record)));
+].map((record, index) => ({ ...record,
+  source: record.source ?? record.act, version: 'by-refinancing-history-2026-11-13',
+  ...(index === 0 ? { supportedThrough: '2026-11-13' } : {}),
+})));
 
 export function getRefinancingRate(date: DateInput = today()): number {
   return getRefinancingRateInfo(date).value;

@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "node --test test/shared.test.cjs test/contracts.test.cjs",
+    "test": "node --test test/shared.test.cjs test/schemas.test.cjs test/referenceData.test.cjs test/contracts.test.cjs",
+    "test:unit": "node --test test/shared.test.cjs test/schemas.test.cjs test/referenceData.test.cjs",
     "test:contracts": "node --test test/contracts.test.cjs",
     "typecheck": "tsc -p test/tsconfig.json --noEmit",
     "build": "tsc",

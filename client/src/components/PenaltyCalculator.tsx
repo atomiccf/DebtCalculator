@@ -3,18 +3,20 @@ import { penaltyMultipleRequestSchema, type PenaltyMultipleRequest, type Penalty
 import styles from '../components/Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { useDocuments } from '../hooks/useDocuments'
-import { DocumentForm, ResultsTable, FormField } from '../components/ui'
+import { DocumentForm, ResultsTable, FormField, NumericInput, ResultStatus } from '../components/ui'
 import { API_ENDPOINTS } from '../config/api'
 import { CalculationDetails } from './ui/CalculationDetails'
+import { parseNumericInput } from '../utils/numericInput'
 
 export default function PenaltyCalculator() {
   const [rate, setRate] = useState('')
   const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
-  const { data, error, loading, execute } = useApi<PenaltyMultipleResponse, PenaltyMultipleRequest>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE, 'POST', { schema: penaltyMultipleRequestSchema })
+  const inputKey = JSON.stringify({ documents, rate })
+  const { data, error, loading, stale, execute } = useApi<PenaltyMultipleResponse, PenaltyMultipleRequest>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE, 'POST', { schema: penaltyMultipleRequestSchema, inputKey })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await execute({ documents, rate: rate === '' ? NaN : Number(rate) })
+    await execute({ documents: documents.map(doc => ({ ...doc, debt: parseNumericInput(doc.debt, true) })), rate: parseNumericInput(rate) })
   }
 
   const results = data?.results as unknown as Record<string, unknown>[] ?? []
@@ -62,14 +64,11 @@ export default function PenaltyCalculator() {
           ))}
         </div>
 
-        <FormField label="Ставка пени (% в день)">
-          <input 
-            type="number" 
+        <FormField label="Ставка, % в день">
+          <NumericInput
             value={rate} 
-            onChange={(e) => setRate(e.target.value)}
+            onChange={setRate}
             required
-            min="0"
-            step="0.01"
           />
         </FormField>
 
@@ -78,6 +77,7 @@ export default function PenaltyCalculator() {
         </button>
       </form>
 
+      {data && <ResultStatus stale={stale} />}
       {results.length > 0 && (
         <ResultsTable columns={columns} data={results} totalRow={totalRow} />
       )}

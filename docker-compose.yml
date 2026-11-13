@@ -31,3 +31,4 @@ services:
     command: cd client && npm run dev
     environment:
       - NODE_ENV=development
+      - API_PROXY_TARGET=http://server:3000

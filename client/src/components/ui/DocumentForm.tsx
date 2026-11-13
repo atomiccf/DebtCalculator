@@ -1,9 +1,11 @@
 import styles from '../../components/Calculator.module.css'
+import type { Document } from '../../hooks/useDocuments'
+import { NumericInput } from './NumericInput'
 
 interface DocumentFormProps {
-  document: Record<string, string | number>
+  document: Document
   index: number
-  onChange: (index: number, field: string, value: string | number) => void
+  onChange: (index: number, field: keyof Document, value: string) => void
   onRemove?: (index: number) => void
   canRemove: boolean
 }
@@ -16,20 +18,19 @@ export function DocumentForm({ document, index, onChange, onRemove, canRemove }:
           <input 
             type="text" 
             required
-            value={document.name as string}
+            aria-label={`Документ ${index + 1}: название`}
+            value={document.name}
             onChange={(e) => onChange(index, 'name', e.target.value)}
             placeholder="Название (накладная №, договор и т.д.)"
           />
         </div>
         <div className={styles.formGroup}>
-          <input 
-            type="number" 
+          <NumericInput
             required
-            value={document.debt as number || ''}
-            onChange={(e) => onChange(index, 'debt', parseFloat(e.target.value) || 0)}
+            label={`Документ ${index + 1}: сумма (BYN)`}
+            value={document.debt}
+            onChange={value => onChange(index, 'debt', value)}
             placeholder="Сумма (BYN)"
-            min="0.01"
-            step="0.01"
           />
         </div>
         <div className={styles.formGroup}>
@@ -37,7 +38,8 @@ export function DocumentForm({ document, index, onChange, onRemove, canRemove }:
           <input 
             type="date" 
             required
-            value={document.startDate as string}
+            aria-label={`Документ ${index + 1}: первый день просрочки`}
+            value={document.startDate}
             onChange={(e) => onChange(index, 'startDate', e.target.value)}
           />
         </div>
@@ -46,8 +48,9 @@ export function DocumentForm({ document, index, onChange, onRemove, canRemove }:
           <input 
             type="date" 
             required
-            min={document.startDate as string}
-            value={document.endDate as string}
+            aria-label={`Документ ${index + 1}: последний день просрочки`}
+            min={document.startDate}
+            value={document.endDate}
             onChange={(e) => onChange(index, 'endDate', e.target.value)}
           />
         </div>

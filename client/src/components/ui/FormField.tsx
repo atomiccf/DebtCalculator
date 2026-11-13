@@ -8,8 +8,7 @@ interface FormFieldProps {
 export function FormField({ label, children }: FormFieldProps) {
   return (
     <div className={styles.formGroup}>
-      <label>{label}</label>
-      {children}
+      <label>{label}{children}</label>
     </div>
   )
 }

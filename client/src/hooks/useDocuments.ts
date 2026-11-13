@@ -1,9 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { CalculationDocument } from 'jurist-calculator-shared'
 
-export interface Document extends CalculationDocument {
-  [key: string]: string | number
-}
+export type Document = Omit<CalculationDocument, 'debt'> & { debt: string }
 
 export interface UseDocumentsOptions {
   initialCount?: number
@@ -11,7 +9,7 @@ export interface UseDocumentsOptions {
 
 const emptyDocument: Document = {
   name: '',
-  debt: 0,
+  debt: '',
   startDate: '',
   endDate: '',
 }
@@ -34,7 +32,7 @@ export function useDocuments(options?: UseDocumentsOptions) {
   }, [])
 
   const updateDocument = useCallback(
-    (index: number, field: string, value: string | number) => {
+    (index: number, field: keyof Document, value: string) => {
       setDocuments(prev => {
         const updated = [...prev]
         updated[index] = { ...updated[index], [field]: value }

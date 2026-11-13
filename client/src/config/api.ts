@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000'
+const API_URL = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')
 
 export const API_ENDPOINTS = {
   DUTY_CALCULATE: '/api/duty/calculate',

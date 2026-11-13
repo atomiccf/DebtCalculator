@@ -27,6 +27,6 @@ export function CalculationDetails({ calculation }: { calculation: CalculationMe
         {referenceData.refinancingRate.record.supportedThrough && ` Поддержано по ${referenceData.refinancingRate.record.supportedThrough}.`}</>}</p>}
     {referenceData.dailyRate && <p>Дневная ставка: {referenceData.dailyRate.value}%. Источник: указана пользователем.
       {' '}Применена за период {referenceData.dailyRate.dateFrom} — {referenceData.dailyRate.dateTo}; срок действия договора отдельно не проверен.</p>}
-    {warnings.length > 0 && <ul aria-label="Предупреждения">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
+    {warnings.length > 0 && <ul aria-label="Предупреждения" role="status">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
   </div>
 }

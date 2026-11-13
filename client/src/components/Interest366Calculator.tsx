@@ -3,10 +3,11 @@ import { interest366MultipleRequestSchema, type Interest366MultipleRequest, type
 import styles from './Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { useDocuments } from '../hooks/useDocuments'
-import { DocumentForm, ResultsTable, FormField } from './ui'
+import { DocumentForm, ResultsTable, FormField, NumericInput, ResultStatus } from './ui'
 import { CalculationDetails } from './ui/CalculationDetails'
 import { DayCountField } from './ui/DayCountField'
 import { API_ENDPOINTS } from '../config/api'
+import { parseNumericInput } from '../utils/numericInput'
 
 export default function Interest366Calculator() {
   const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
@@ -16,12 +17,13 @@ export default function Interest366Calculator() {
   const [hasPenalty, setHasPenalty] = useState(false)
   const [statutoryException, setException] = useState(false)
   const [refinancingRate, setRate] = useState('')
-  const { data, error, loading, execute } = useApi<Interest366MultipleResponse, Interest366MultipleRequest>(API_ENDPOINTS.INTEREST_366_MULTIPLE, 'POST', { schema: interest366MultipleRequestSchema })
+  const inputKey = JSON.stringify({ documents, calculationBasis, rateDate, dayCount, hasPenalty, statutoryException, refinancingRate })
+  const { data, error, loading, stale, execute } = useApi<Interest366MultipleResponse, Interest366MultipleRequest>(API_ENDPOINTS.INTEREST_366_MULTIPLE, 'POST', { schema: interest366MultipleRequestSchema, inputKey })
   const multiYear = documents.some(d => d.startDate && d.endDate && d.startDate.slice(0, 4) !== d.endDate.slice(0, 4))
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const options = { documents, hasPenalty, statutoryException: hasPenalty && statutoryException,
-      ...(refinancingRate !== '' ? { refinancingRate: Number(refinancingRate) } : {}) }
+    const options = { documents: documents.map(doc => ({ ...doc, debt: parseNumericInput(doc.debt, true) })), hasPenalty, statutoryException: hasPenalty && statutoryException,
+      ...(refinancingRate.trim() !== '' ? { refinancingRate: parseNumericInput(refinancingRate) } : {}) }
     const request: Interest366MultipleRequest = calculationBasis === 'estimate'
       ? { ...options, calculationBasis, ...(rateDate ? { rateDate } : {}), ...(dayCount !== '' ? { dayCount } : {}) }
       : { ...options, calculationBasis, rateDate, dayCount: dayCount as AnnualDayCount }
@@ -54,11 +56,13 @@ export default function Interest366Calculator() {
         <option value="no">Нет</option><option value="yes">Да</option>
       </select></FormField>
       {hasPenalty && <label><input type="checkbox" required checked={statutoryException} onChange={e => setException(e.target.checked)} /> Установлено законодательное исключение для одновременного взыскания процентов</label>}
-      <FormField label="Явная годовая ставка (%), если задана отдельно"><input type="number" min="0" step="any" value={refinancingRate} onChange={e => setRate(e.target.value)} /></FormField>
+      <FormField label="Явная годовая ставка (%), если задана отдельно"><NumericInput value={refinancingRate} onChange={setRate} /></FormField>
+      <p className={styles.calculatorDescription}>Если ставка не указана, она выбирается из справочника на дату выбора ставки. В предварительном расчёте без этой даты используется конец периода каждого документа.</p>
       <div className={styles.documentsHeader}><span>Документы</span><button type="button" className={styles.btnAdd} onClick={addDocument}>+ Добавить документ</button></div>
       <div className={styles.documentsList}>{documents.map((doc, index) => <DocumentForm key={index} document={doc} index={index} onChange={updateDocument} onRemove={removeDocument} canRemove={documents.length > 1} />)}</div>
       <button type="submit" className={styles.btn} disabled={loading}>{loading ? 'Расчёт...' : 'Рассчитать'}</button>
     </form>
+    {data && <ResultStatus stale={stale} />}
     {results.length > 0 && <ResultsTable columns={columns} data={results} totalRow={[{ value: 'Итого', colSpan: 6 }, { value: `${data?.total} BYN` }]} />}
     {data && data.results.map((row, index) => <div key={index}><p>{row.name}</p><CalculationDetails calculation={row} /></div>)}
     {error && <div className={styles.error}>{error}</div>}

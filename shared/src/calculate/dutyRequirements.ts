@@ -11,7 +11,7 @@ const COMMON_PLAINTIFFS: readonly PlaintiffType[] = ['individual', 'organization
 const ECONOMIC_PLAINTIFFS: readonly PlaintiffType[] = [...COMMON_PLAINTIFFS, 'ip'];
 const ADMINISTRATIVE_PENALTIES = ['fine', 'other'];
 
-type DutyCaseType = typeof COMMON_CASES[number] | typeof ECONOMIC_CASES[number];
+export type DutyCaseType = typeof COMMON_CASES[number] | typeof ECONOMIC_CASES[number];
 interface CaseRequirements {
   amount?: boolean;
   plaintiff?: PlaintiffType;

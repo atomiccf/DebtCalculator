@@ -249,11 +249,42 @@ test('automatic exemptions apply to alimony and the supported appeal stages', ()
 });
 
 test('alimony catalog entry agrees with the legal basis documented in LEGAL_REVIEW.md', () => {
-  // Known data defect: the legal citation is still 1.1 instead of the documented 1.1.2.
-  // Use the actual two-argument API; do not assume applicant/stage filtering exists.
   const entries = api.getDiscountsForCourt('common', 'alimony');
   assert.ok(entries.some(entry => /1\.1\.2\b/.test(entry.articleRef) && /285/.test(entry.articleRef)),
     'Expected the documented alimony basis: subparagraph 1.1.2, Article 285');
+});
+
+test('discount references use supported court and claim identifiers', () => {
+  for (const entry of api.discounts) {
+    assert.equal(entry.kind, 'reference-only');
+    for (const courtType of entry.courtTypes) {
+      assert.ok(api.DUTY_COURTS.includes(courtType));
+      for (const caseType of entry.caseTypes) {
+        for (const plaintiffType of entry.appliesTo) {
+          assert.ok(api.isDutyCaseAvailable({ courtType, caseType, plaintiffType }));
+        }
+      }
+    }
+  }
+  // The legacy ID stays stable independently of the corrected legal reference.
+  assert.match(api.getDiscountById('1.1').articleRef, /1\.1\.2\b/);
+  assert.equal(api.getDiscountById('missing'), undefined);
+  assert.deepEqual(api.getDiscountsForCourt('common', 'cassation'), []);
+  for (const court of api.ECONOMIC_COURTS) {
+    assert.deepEqual(api.getDiscountsForCourt(court, 'bankruptcy'), []);
+  }
+});
+
+test('a matching reference does not grant an automatic exemption', () => {
+  const [reference] = api.getDiscountsForCourt('common', 'appeal');
+  assert.match(reference.articleRef, /1\.3\.4\b/);
+  assert.deepEqual(reference.appliesTo, ['individual']);
+  assert.deepEqual(reference.originalCaseTypes, ['divorce', 'divorce_repeat', 'divorce_missing']);
+  // The two-argument reference lookup cannot distinguish these legal facts.
+  assert.equal(api.calculateCommonCourtDutyWithBaseValue({ ...common, caseType: 'appeal', originalCaseType: 'divorce' }, 45), 0);
+  assert.equal(api.calculateCommonCourtDutyWithBaseValue({ ...common, caseType: 'appeal', originalCaseType: 'divorce', plaintiffType: 'organization' }, 45), 144);
+  assert.equal(api.calculateCommonCourtDutyWithBaseValue({ ...common, caseType: 'appeal', originalCaseType: 'non_property' }, 45), 108);
+  assert.equal(api.calculateCommonCourtDutyWithBaseValue({ ...common, caseType: 'appeal', originalCaseType: 'divorce' }, 45, 1000), 108);
 });
 
 test('administrative complaint rates require the sanction facts', () => {

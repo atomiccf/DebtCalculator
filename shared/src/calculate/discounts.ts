@@ -1,113 +1,58 @@
+import type { DutyCaseType } from './dutyRequirements';
+import type { CourtType, OriginalCaseType, PlaintiffType } from './dutyTypes';
+
+/** Reference information, not an eligibility decision or an executable duty rule. */
 export interface Discount {
-  id: string;
-  name: string;
-  description: string;
-  articleRef: string;
-  appliesTo: 'individual' | 'organization' | 'both';
-  courtTypes: string[];
-  caseTypes: string[];
+  readonly kind: 'reference-only';
+  /** Stable catalog identifier; it is not a legal citation. */
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly articleRef: string;
+  readonly appliesTo: readonly PlaintiffType[];
+  readonly courtTypes: readonly CourtType[];
+  readonly caseTypes: readonly DutyCaseType[];
+  /** Relevant original claims when caseTypes contains a complaint stage. */
+  readonly originalCaseTypes?: readonly OriginalCaseType[];
 }
 
-export const discounts: Discount[] = [
+/**
+ * Incomplete reference subset from LEGAL_REVIEW.md for the reviewed 2026 edition.
+ * Automatic exemptions are implemented in rules2026.ts and dutyRequirements.ts;
+ * adding an entry here never changes the calculated duty.
+ */
+export const discounts: readonly Discount[] = [
   {
+    kind: 'reference-only',
     id: '1.1',
     name: 'Истцы по алиментам',
-    description: 'Истцы (взыскатели, заявители) за рассмотрение исковых заявлений о взыскании алиментов или расходов, затраченных государством на содержание детей',
-    articleRef: 'п.1.1 ст.285 НК',
-    appliesTo: 'both',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['alimony', 'child_expenses']
+    description: 'Освобождение истца по требованию о взыскании алиментов в суде общей юрисдикции',
+    articleRef: 'подп. 1.1.2 ст. 285 НК',
+    appliesTo: ['individual', 'organization'],
+    courtTypes: ['common'],
+    caseTypes: ['alimony'],
   },
   {
-    id: '1.2',
-    name: 'Истцы по возмещению вреда',
-    description: 'Истцы за рассмотрение исковых заявлений о возмещении вреда, причиненного увечьем или иным повреждением здоровья, а также смертью кормильца',
-    articleRef: 'п.1.2 ст.285 НК',
-    appliesTo: 'both',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['damage', 'compensation']
+    kind: 'reference-only',
+    id: '1.3.4',
+    name: 'Апелляция по расторжению брака',
+    description: 'Освобождение физического лица при подаче апелляционной жалобы по делу о расторжении брака без раздела имущества',
+    articleRef: 'подп. 1.3.4 ст. 285 НК',
+    appliesTo: ['individual'],
+    courtTypes: ['common'],
+    caseTypes: ['appeal'],
+    originalCaseTypes: ['divorce', 'divorce_repeat', 'divorce_missing'],
   },
-  {
-    id: '1.3',
-    name: 'Инвалиды I и II группы',
-    description: 'Инвалиды I и II группы',
-    articleRef: 'п.1.3 ст.285 НК',
-    appliesTo: 'individual',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['all']
-  },
-  {
-    id: '1.4',
-    name: 'Ветераны ВОВ',
-    description: 'Участники Великой Отечественной войны, инвалиды боевых действий на территории других государств',
-    articleRef: 'п.1.4 ст.285 НК',
-    appliesTo: 'individual',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['all']
-  },
-  {
-    id: '1.5',
-    name: 'Многодетные семьи',
-    description: 'Многодетные семьи (имеющие троих и более детей)',
-    articleRef: 'п.1.5 ст.285 НК',
-    appliesTo: 'individual',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['all']
-  },
-  {
-    id: '1.7',
-    name: 'Защита прав потребителей',
-    description: 'Истцы за рассмотрение исковых заявлений по спорам, связанным с нарушением прав потребителей',
-    articleRef: 'п.1.7 ст.285 НК',
-    appliesTo: 'individual',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['consumer_rights']
-  },
-  {
-    id: '1.8',
-    name: 'Дела о банкротстве',
-    description: 'Управляющий (антикризисный управляющий) за рассмотрение заявления о банкротстве',
-    articleRef: 'п.1.8 ст.285 НК',
-    appliesTo: 'organization',
-    courtTypes: ['economic', 'supreme'],
-    caseTypes: ['bankruptcy']
-  },
-  {
-    id: '2.1',
-    name: 'Физические лица (судебные дела)',
-    description: 'Физические лица по судебным делам, связанным с социальными выплатами, пенсиями, возмещением вреда',
-    articleRef: 'п.2.1 ст.285 НК',
-    appliesTo: 'individual',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['social', 'pension', 'damage']
-  },
-  {
-    id: '2.1-1',
-    name: 'Страхователи по спорам о качестве',
-    description: 'Страхователи (физические лица) по спорам о качестве поставленного товара',
-    articleRef: 'п.2.1-1 ст.285 НК',
-    appliesTo: 'individual',
-    courtTypes: ['economic', 'supreme'],
-    caseTypes: ['quality_dispute']
-  },
-  {
-    id: '2.13',
-    name: 'Объекты жилищных отношений',
-    description: 'Споры, связанные с заключением, изменением, исполнением, прекращением договоров создания объектов долевого строительства',
-    articleRef: 'п.2.13 ст.285 НК',
-    appliesTo: 'both',
-    courtTypes: ['common', 'economic', 'supreme'],
-    caseTypes: ['housing']
-  }
 ];
 
 export function getDiscountById(id: string): Discount | undefined {
   return discounts.find(d => d.id === id);
 }
 
-export function getDiscountsForCourt(courtType: string, caseType: string): Discount[] {
-  return discounts.filter(d => 
-    (d.courtTypes.includes(courtType) || d.courtTypes.includes('all')) &&
-    (d.caseTypes.includes(caseType) || d.caseTypes.includes('all'))
-  );
+/**
+ * Filters references by court and claim only, without checking the applicant,
+ * original claim, amount, date or other legal facts. A match grants no exemption.
+ */
+export function getDiscountsForCourt(courtType: CourtType, caseType: DutyCaseType): Discount[] {
+  return discounts.filter(d => d.courtTypes.includes(courtType) && d.caseTypes.includes(caseType));
 }

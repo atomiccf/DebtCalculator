@@ -1,3 +1,4 @@
+import { CalculationError } from '../utils/calculationError';
 import { DateInput, parseDate } from '../utils/dateUtils';
 
 /** Reviewed current edition, not an implementation of historical tax legislation. */
@@ -11,7 +12,7 @@ export const DUTY_RULES_2026 = Object.freeze({
 
 export function assertDutyRulesDate(date: DateInput): void {
   if (parseDate(date).year !== DUTY_RULES_2026.supportedYear) {
-    throw new Error('Проверенная редакция тарифов поддерживает обращения в суд в 2026 году; для другого года нужна отдельная редакция');
+    throw new CalculationError('Проверенная редакция тарифов поддерживает обращения в суд в 2026 году; для другого года нужна отдельная редакция');
   }
 }
 

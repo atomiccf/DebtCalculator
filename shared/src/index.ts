@@ -7,3 +7,5 @@ export * from './utils/money';
 export * from './referenceData/effectiveRecord';
 export * from './penalty/accrual';
 export * from './contracts';
+export * from './services';
+export * from './utils/calculationError';

@@ -358,3 +358,48 @@ test('penalties have no assumed statutory daily rate', () => {
   assert.throws(() => api.calculatePenalty({ debt: 1000, startDate: period.startDate, endDate: period.endDate }));
   assert.equal(api.calculatePenalty({ ...period, rate: 0 }).penalty, 0);
 });
+
+test('penalty request contracts require a daily rate and reject annual options, including zero', () => {
+  for (const [calculate, input] of [
+    [api.calculatePenaltyRequest, { debt: 1000, startDate: '2024-02-28', endDate: '2024-03-01' }],
+    [api.calculatePenaltyMultipleRequest, { documents: [{ name: 'a', debt: 1000, startDate: '2024-02-28', endDate: '2024-03-01' }] }],
+  ]) {
+    for (const options of [{}, { rate: null }, { rate: '' }, { rate: '0' }, { rate: -1 }, { rate: NaN }, { rate: Infinity }]) {
+      assert.throws(() => calculate({ ...input, ...options }), error =>
+        error instanceof api.ContractValidationError && error.issues.some(issue => issue.path === 'rate'));
+    }
+    for (const annualRate of [0, 10, null]) {
+      for (const rate of [undefined, 0, 0.1]) {
+        assert.throws(() => calculate({ ...input, rate, annualRate }), error =>
+          error instanceof api.ContractValidationError && error.issues.some(issue => issue.path === 'annualRate'));
+      }
+    }
+    assert.throws(() => calculate({ ...input, rate: 0.1, dayCount: 365 }), api.ContractValidationError);
+    for (const rate of [0, 0.1]) {
+      const response = calculate({ ...input, rate });
+      assert.equal(response.total ?? response.amount, rate === 0 ? 0 : 3);
+      const row = response.results ? response.results[0] : response;
+      assert.equal(row.days, 3);
+      assert.equal(row.rate, rate);
+      assert.equal(row.type, 'penalty');
+      assert.equal(row.methodology.kind, 'daily');
+      assert.equal(row.annualRate, undefined);
+      assert.equal(row.methodology.dayCount, undefined);
+    }
+  }
+});
+
+test('application services aggregate rounded daily and Article 366 rows with the same single-period rules', () => {
+  const daily = api.calculatePenaltyMultipleService({ rate: 0.5, documents: [
+    { name: ' a ', debt: 1, startDate: '2024-02-29', endDate: '2024-02-29' },
+    { name: 'b', debt: 1, startDate: '2024-02-29', endDate: '2024-02-29' },
+  ] });
+  assert.equal(daily.total, 0.02);
+  assert.deepEqual(daily.results.map(row => [row.name, row.days, row.amount]), [['a', 1, 0.01], ['b', 1, 0.01]]);
+  const annual = api.calculateInterest366MultipleService({
+    calculationBasis: 'judgment', rateDate: '2024-01-02', dayCount: 'actual/actual', hasPenalty: false, refinancingRate: 10,
+    documents: ['a', 'b'].map(name => ({ name, debt: 100000, startDate: '2023-12-31', endDate: '2024-01-02' })),
+  });
+  assert.equal(annual.total, 164.08);
+  assert.deepEqual(annual.results.map(row => [row.days, row.interest, row.dayCount]), [[3, 82.04, 'actual/actual'], [3, 82.04, 'actual/actual']]);
+});

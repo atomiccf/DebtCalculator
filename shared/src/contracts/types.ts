@@ -11,9 +11,7 @@ export type CalendarDate = string;
 export type DutyRequest = DutyCalculationInput;
 export interface PeriodRequest { debt: number; startDate: CalendarDate; endDate: CalendarDate }
 export interface CalculationDocument extends PeriodRequest { name: string }
-export type PenaltyOptions =
-  | { rate: number; annualRate?: never; dayCount?: never }
-  | { rate?: never; annualRate: number; dayCount: AnnualDayCount };
+export interface PenaltyOptions { rate: number }
 export type PenaltyRequest = PeriodRequest & PenaltyOptions;
 export type PenaltyMultipleRequest = { documents: CalculationDocument[] } & PenaltyOptions;
 export type Interest366RequestOptions = {
@@ -45,11 +43,11 @@ export interface CalculationMetadata {
 }
 export type DutyResponse = DutyCalculationResult & CalculationMetadata & { input: DutyRequest };
 export type PenaltyResponse = AccrualResult & CalculationMetadata & {
-  type: 'penalty' | 'interest'; penalty: number; annualRate?: number;
+  type: 'penalty'; penalty: number;
 };
 export type PenaltyDocumentResponse = PenaltyResponse & { name: string };
 export type PenaltyMultipleResponse = CalculationMetadata & {
-  results: PenaltyDocumentResponse[]; total: number; type: 'penalty' | 'interest'; rate: number;
+  results: PenaltyDocumentResponse[]; total: number; type: 'penalty'; rate: number;
 };
 export type Interest366Response = Interest366Result & CalculationMetadata & { input: Interest366Request };
 export type Interest366MultipleResponse = CalculationMetadata & { results: (Interest366Response & { name: string })[]; total: number };
@@ -58,4 +56,4 @@ export interface CaseTypesResponse {
   economic: { id: EconomicCaseType; name: string }[];
 }
 export interface ValidationIssue { path: string; message: string }
-export interface ApiErrorResponse { error: string; issues?: ValidationIssue[] }
+export interface ApiErrorResponse { error: string; issues: ValidationIssue[] }

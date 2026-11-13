@@ -18,7 +18,9 @@ Module._load = function(request, ...args) {
   return originalLoad.call(this, request, ...args);
 };
 const api = require('../src/index.ts');
-const app = require('../../server/src/index.ts').default;
+const { createApp } = require('../../server/src/app.ts');
+const { errorHandler } = require('../../server/src/middleware/errors.ts');
+const app = createApp();
 const period = { debt: 10000, startDate: '2026-05-01', endDate: '2026-05-31' };
 const legal = { calculationBasis: 'judgment', rateDate: '2026-06-01', dayCount: 'actual/actual', hasPenalty: false };
 const duty = { courtType: 'common', caseType: 'property', plaintiffType: 'individual', amount: 1000, date: '2026-11-12' };
@@ -95,28 +97,70 @@ test('dates: timestamps, local date strings, impossible dates and reversed perio
 test('penalty: both endpoints require an explicit rate and preserve zero', async () => {
   for (const endpoint of ['/api/penalty/calculate', '/api/penalty/calculate-multiple']) {
     const request = endpoint.endsWith('multiple') ? { documents: [{ ...period, name: 'Договор' }] } : period;
-    assert.equal((await post(endpoint, request)).status, 400);
-    for (const options of [{ rate: 0 }, { annualRate: 0, dayCount: 360 }]) {
+    for (const options of [{}, { rate: null }, { rate: '' }, { rate: '0' }, { rate: -1 }]) {
+      const { status, body } = await post(endpoint, { ...request, ...options });
+      assert.equal(status, 400);
+      assert.ok(body.issues.some(i => i.path === 'rate'));
+    }
+    for (const options of [{ rate: 0 }, { rate: 0.1 }]) {
       const { status, body } = await post(endpoint, { ...request, ...options });
       assert.equal(status, 200);
-      assert.equal(body.total ?? body.amount, 0);
-      assert.equal(body.rate, 0);
+      assert.equal(body.total ?? body.amount, options.rate === 0 ? 0 : 310);
+      assert.equal(body.rate, options.rate);
+      assert.equal(body.type, 'penalty');
+      assert.equal(body.methodology.kind, 'daily');
+      assert.equal(body.methodology.dayCount, undefined);
+      assert.equal(body.annualRate, undefined);
       metadata(body);
-      if (body.results) metadata(body.results[0]);
+      const row = body.results ? body.results[0] : body;
+      assert.equal(row.days, 31);
+      assert.equal(row.penalty, row.amount);
+      metadata(row);
     }
-    assert.equal((await post(endpoint, { ...request, annualRate: 10 })).status, 400);
-    assert.equal((await post(endpoint, { ...request, rate: 1, annualRate: 10, dayCount: 360 })).status, 400);
+    for (const annualRate of [0, 10, null]) {
+      for (const rate of [undefined, 0, 1]) {
+        const { status, body } = await post(endpoint, { ...request, rate, annualRate, dayCount: 360 });
+        assert.equal(status, 400);
+        assert.ok(body.issues.some(i => i.path === 'annualRate'));
+        assert.ok(body.issues.some(i => i.path === 'dayCount'));
+      }
+    }
+    assert.equal((await post(endpoint, { ...request, rate: 0.1, dayCount: 365 })).status, 400);
   }
 });
-test('annual penalty: selected day count reaches the core, with exact row aggregation', async () => {
+test('daily penalty: services and both endpoints share inclusive days, rounding and exact row aggregation', async () => {
+  const documents = [
+    { name: ' a ', debt: 1, startDate: '2024-02-29', endDate: '2024-02-29' },
+    { name: 'b', debt: 1, startDate: '2024-02-29', endDate: '2024-02-29' },
+  ];
+  const input = { documents, rate: 0.5 };
+  const { status, body } = await post('/api/penalty/calculate-multiple', input);
+  assert.equal(status, 200);
+  assert.equal(body.total, 0.02);
+  assert.deepEqual(body, api.calculatePenaltyMultipleService(input));
+  assert.deepEqual(body, api.calculatePenaltyMultipleRequest(input));
+  for (const [index, doc] of documents.entries()) {
+    const { name, ...period } = doc;
+    const single = await post('/api/penalty/calculate', { ...period, rate: input.rate });
+    assert.equal(single.status, 200);
+    assert.equal(single.body.days, 1);
+    assert.equal(single.body.amount, 0.01);
+    assert.deepEqual(body.results[index], { ...single.body, name: name.trim() });
+    assert.deepEqual(single.body, api.calculatePenaltyService({ ...period, rate: input.rate }));
+  }
+});
+test('Article 366: selected annual day count reaches the core, with exact row aggregation', async () => {
   const documents = [
     { name: 'a', debt: 100000, startDate: '2023-12-31', endDate: '2024-01-02' },
     { name: 'b', debt: 100000, startDate: '2023-12-31', endDate: '2024-01-02' },
   ];
-  const { body } = await post('/api/penalty/calculate-multiple', { documents, annualRate: 10, dayCount: 'actual/actual' });
+  const input = { documents, ...legal, refinancingRate: 10 };
+  const { status, body } = await post('/api/interest/calculate-366-multiple', input);
+  assert.equal(status, 200);
   assert.equal(body.total, 164.08);
-  assert.equal(body.results[0].amount, 82.04);
+  assert.equal(body.results[0].interest, 82.04);
   assert.equal(body.methodology.dayCount, 'actual/actual');
+  assert.deepEqual(body, api.calculateInterest366MultipleService(input));
 });
 test('Article 366: both endpoints preserve all legal and methodological options', async () => {
   for (const calculationBasis of ['payment', 'judgment', 'executive-endorsement']) {
@@ -175,4 +219,46 @@ test('malformed JSON and invalid rate date queries return JSON errors', async ()
   assert.equal(typeof (await response.json()).error, 'string');
   const query = await fetch(url + '/api/rates/base-value?date=2026-01-01T00:00:00Z');
   assert.equal(query.status, 400);
+});
+
+test('API errors have the same shape for validation, calculation, JSON parsing, size limits and unknown routes', async () => {
+  const historical = await fetch(url + '/api/rates/base-value?date=1900-01-01');
+  const responses = [
+    [await post('/api/penalty/calculate', period), 400],
+    [await post('/api/duty/calculate', { ...duty, caseType: 'court_order', amount: 4500 }), 400],
+    [{ status: historical.status, body: await historical.json() }, 400],
+  ];
+  for (const [body, status] of [['{', 400], ['null', 400], ['"' + 'a'.repeat(110000) + '"', 413]]) {
+    const response = await fetch(url + '/api/penalty/calculate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+    });
+    responses.push([{ status: response.status, body: await response.json() }, status]);
+  }
+  const missing = await fetch(url + '/api/missing');
+  responses.push([{ status: missing.status, body: await missing.json() }, 404]);
+  for (const [response, status] of responses) {
+    assert.equal(response.status, status);
+    assert.deepEqual(Object.keys(response.body).sort(), ['error', 'issues']);
+    assert.equal(typeof response.body.error, 'string');
+    assert.ok(response.body.issues.length > 0);
+    for (const issue of response.body.issues) {
+      assert.equal(typeof issue.path, 'string');
+      assert.equal(typeof issue.message, 'string');
+    }
+  }
+});
+
+test('unexpected failures, including internal SyntaxError, return 500 without exposing details', () => {
+  for (const error of [new Error('private details'), new SyntaxError('private details'), null]) {
+    const res = {
+      status(value) { this.statusCode = value; return this; },
+      json(value) { this.body = value; return this; },
+    };
+    errorHandler(error, {}, res, () => assert.fail('unexpected next'));
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.body, {
+      error: 'Внутренняя ошибка сервера',
+      issues: [{ path: 'request', message: 'Внутренняя ошибка сервера' }],
+    });
+  }
 });

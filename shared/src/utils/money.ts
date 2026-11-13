@@ -1,3 +1,4 @@
+import { CalculationError } from './calculationError';
 import { assertNonNegativeNumber, assertPositiveNumber } from './validation';
 
 // BigInts remain internal; public amounts are JSON-compatible numbers in BYN.
@@ -11,10 +12,10 @@ function decimalFraction(value: number): [bigint, bigint] {
 }
 
 function fromMinorUnits(minor: bigint): number {
-  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Сумма превышает безопасный предел точности');
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) throw new CalculationError('Сумма превышает безопасный предел точности');
   const value = Number(minor) / 100;
   const [numerator, denominator] = decimalFraction(value);
-  if (numerator * 100n !== minor * denominator) throw new Error('Сумма теряет точность при преобразовании в число');
+  if (numerator * 100n !== minor * denominator) throw new CalculationError('Сумма теряет точность при преобразовании в число');
   return value;
 }
 
@@ -30,7 +31,7 @@ export function fromDutyUnits(value: bigint): number {
 export function toMinorUnits(value: number): bigint {
   const [numerator, denominator] = decimalFraction(value);
   if ((numerator * 100n) % denominator !== 0n) {
-    throw new Error('Денежная сумма должна содержать не более двух знаков после запятой');
+    throw new CalculationError('Денежная сумма должна содержать не более двух знаков после запятой');
   }
   const minor = numerator * 100n / denominator;
   fromMinorUnits(minor);

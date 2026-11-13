@@ -1,3 +1,4 @@
+import { CalculationError } from '../utils/calculationError';
 import { Temporal } from '@js-temporal/polyfill';
 import { DateInput, parseDate } from '../utils/dateUtils';
 
@@ -21,6 +22,6 @@ export function getEffectiveRecord<T extends EffectiveRecord>(records: readonly 
       if (!match || Temporal.PlainDate.compare(from, parseDate(match.dateFrom)) > 0) match = record;
     }
   }
-  if (!match) throw new Error(`Нет справочных данных на дату ${target.toString()}`);
+  if (!match) throw new CalculationError(`Нет справочных данных на дату ${target.toString()}`);
   return match;
 }

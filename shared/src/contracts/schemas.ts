@@ -96,15 +96,9 @@ const periodKeys = ['debt', 'startDate', 'endDate'];
 export const calendarDateSchema: RequestSchema<string> = { parse(value) {
   const c = new Check(); c.date(value, 'date'); return c.finish<string>(value);
 } };
-const penaltyKeys = ['rate', 'annualRate', 'dayCount'];
+const penaltyKeys = ['rate'];
 function penaltyCheck(c: Check, v: Record<string, unknown>) {
-  if (v.annualRate !== undefined) {
-    c.rate(v.annualRate, 'annualRate'); c.one(v.dayCount, dayCounts, 'dayCount');
-    if (v.rate !== undefined) c.add('rate', 'Укажите только одну ставку: дневную или годовую');
-  } else {
-    c.rate(v.rate, 'rate');
-    if (v.dayCount !== undefined) c.add('dayCount', 'Делитель применяется только к годовой ставке');
-  }
+  c.rate(v.rate, 'rate');
 }
 export const penaltyRequestSchema: RequestSchema<PenaltyRequest> = { parse(value) {
   const c = new Check(); const v = c.object(value, 'request');

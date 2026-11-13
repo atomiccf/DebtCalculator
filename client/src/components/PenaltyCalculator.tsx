@@ -1,25 +1,20 @@
 import { useState } from 'react'
-import { penaltyMultipleRequestSchema, type PenaltyMultipleRequest, type PenaltyMultipleResponse, type PenaltyDocumentResponse, type AnnualDayCount } from 'jurist-calculator-shared'
+import { penaltyMultipleRequestSchema, type PenaltyMultipleRequest, type PenaltyMultipleResponse, type PenaltyDocumentResponse } from 'jurist-calculator-shared'
 import styles from '../components/Calculator.module.css'
 import { useApi } from '../hooks/useApi'
 import { useDocuments } from '../hooks/useDocuments'
 import { DocumentForm, ResultsTable, FormField } from '../components/ui'
 import { API_ENDPOINTS } from '../config/api'
 import { CalculationDetails } from './ui/CalculationDetails'
-import { DayCountField } from './ui/DayCountField'
 
 export default function PenaltyCalculator() {
   const [rate, setRate] = useState('')
-  const [annual, setAnnual] = useState(false)
-  const [dayCount, setDayCount] = useState<AnnualDayCount | ''>('')
   const { documents, addDocument, removeDocument, updateDocument } = useDocuments()
   const { data, error, loading, execute } = useApi<PenaltyMultipleResponse, PenaltyMultipleRequest>(API_ENDPOINTS.PENALTY_CALCULATE_MULTIPLE, 'POST', { schema: penaltyMultipleRequestSchema })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await execute(annual
-      ? { documents, annualRate: rate === '' ? NaN : Number(rate), dayCount: dayCount as AnnualDayCount }
-      : { documents, rate: rate === '' ? NaN : Number(rate) })
+    await execute({ documents, rate: rate === '' ? NaN : Number(rate) })
   }
 
   const results = data?.results as unknown as Record<string, unknown>[] ?? []
@@ -67,11 +62,7 @@ export default function PenaltyCalculator() {
           ))}
         </div>
 
-        <FormField label="Тип ставки"><select value={annual ? 'annual' : 'daily'} onChange={e => setAnnual(e.target.value === 'annual')}>
-          <option value="daily">Дневная</option><option value="annual">Годовая</option>
-        </select></FormField>
-        {annual && <DayCountField value={dayCount} onChange={setDayCount} required />}
-        <FormField label={annual ? 'Ставка (% в год)' : 'Ставка пени (% в день)'}>
+        <FormField label="Ставка пени (% в день)">
           <input 
             type="number" 
             value={rate} 
@@ -93,7 +84,7 @@ export default function PenaltyCalculator() {
 
       {results.length > 0 && (
         <div className={styles.resultsSummary}>
-          Ставка: {resultRate}% {data?.type === 'interest' ? 'в год' : 'в день'}
+          Ставка: {resultRate}% в день
           {data && <CalculationDetails calculation={data} />}
         </div>
       )}
